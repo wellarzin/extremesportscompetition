@@ -99,7 +99,7 @@ export function Companies() {
               <div className="p-6 bg-gradient-to-br from-[#4169E1]/20 to-[#4169E1]/5 rounded-2xl border border-[#4169E1]/20">
                 <Mail className="w-8 h-8 text-[#4169E1] mb-4" />
                 <h4 className="text-white font-semibold mb-2">Email Comercial</h4>
-                <p className="text-white/60 text-sm">projetos@extremesportscompetition.com</p>
+                <p className="text-white/60 text-sm">extremesportscompetition@gmail.com</p>
               </div>
               <div className="p-6 bg-gradient-to-br from-[#FF6B00]/20 to-[#FF6B00]/5 rounded-2xl border border-[#FF6B00]/20">
                 <Phone className="w-8 h-8 text-[#FF6B00] mb-4" />

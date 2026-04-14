@@ -99,48 +99,47 @@ export function Stats() {
   return (
     <section
       ref={sectionRef}
-      className="relative py-24 md:py-32 bg-[#0A0A0A] overflow-hidden"
+      className="relative py-24 md:py-32 bg-[#f4f4f4] overflow-hidden"
     >
-      {/* Background Effects */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[#4169E1]/5 rounded-full blur-3xl" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#FF6B00]/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#4169E1]/5 rounded-full blur-3xl" />
+      {/* Subtle ambient */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-[#4169E1]/6 rounded-full blur-[120px]" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8">
-        {/* Section Header */}
-        <div ref={titleRef} className="text-center mb-16">
-          <span className="inline-block px-4 py-2 rounded-full bg-[#FF6B00]/10 border border-[#FF6B00]/20 text-[#FF6B00] text-sm font-medium mb-6">
-            {statsConfig.subtitle}
-          </span>
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-sans font-bold text-white tracking-tight mb-6">
-            {statsConfig.titleRegular}{' '}
-            <span className="font-serif italic text-[#4169E1]">{statsConfig.titleItalic}</span>
-          </h2>
+        {/* Section Header — assimétrico */}
+        <div ref={titleRef} className="mb-16 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div>
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#FF6B00]/10 border border-[#FF6B00]/20 text-[#FF6B00] text-xs font-semibold tracking-widest uppercase mb-5">
+              {statsConfig.subtitle}
+            </span>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-sans font-extrabold text-[#0A0A0A] tracking-tight leading-none">
+              {statsConfig.titleRegular}{' '}
+              <span className="font-serif italic text-[#4169E1]">{statsConfig.titleItalic}</span>
+            </h2>
+          </div>
+          <p className="text-[#0A0A0A]/50 text-base md:max-w-[260px] md:text-right leading-relaxed">
+            Números reais de uma plataforma que cresce com quem move o mundo.
+          </p>
         </div>
 
         {/* Stats Grid */}
-        <div ref={statsRef} className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        <div ref={statsRef} className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-5">
           {statsConfig.stats.map((stat, index) => (
-            <div
-              key={index}
-              className="stat-card relative group"
-            >
-              <div className="relative p-6 md:p-8 bg-[#141414] rounded-2xl border border-white/5 hover:border-[#4169E1]/30 transition-all duration-500 overflow-hidden">
-                {/* Gradient Background on Hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#4169E1]/10 via-transparent to-[#FF6B00]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
-                {/* Content */}
+            <div key={index} className="stat-card relative group">
+              <div className="relative p-6 md:p-8 bg-white rounded-2xl border border-black/5 hover:border-[#4169E1]/20 transition-all duration-500 overflow-hidden shadow-sm">
+                {/* Gradient on hover */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#4169E1]/5 via-transparent to-[#FF6B00]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
                 <div className="relative z-10">
                   {/* Icon */}
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#4169E1]/20 to-[#FF6B00]/20 flex items-center justify-center mb-6 text-[#4169E1] group-hover:text-[#FF6B00] transition-colors duration-300">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#4169E1]/10 to-[#FF6B00]/10 flex items-center justify-center mb-5 text-[#4169E1] group-hover:text-[#FF6B00] transition-colors duration-300">
                     {getIcon(index)}
                   </div>
 
                   {/* Value */}
-                  <div className="flex items-baseline gap-1 mb-2">
-                    <span className="text-4xl md:text-5xl font-bold text-white">
+                  <div className="flex items-baseline gap-0.5 mb-1.5">
+                    <span className="text-4xl md:text-5xl font-extrabold text-[#0A0A0A] tracking-tight">
                       {formatValue(animatedValues[index])}
                     </span>
                     <span className="text-2xl md:text-3xl font-bold text-[#FF6B00]">
@@ -149,13 +148,7 @@ export function Stats() {
                   </div>
 
                   {/* Label */}
-                  <p className="text-white/60 text-sm md:text-base">{stat.label}</p>
-                </div>
-
-                {/* Decorative Corner */}
-                <div className="absolute top-0 right-0 w-20 h-20 opacity-10">
-                  <div className="absolute top-4 right-4 w-8 h-[2px] bg-white" />
-                  <div className="absolute top-4 right-4 w-[2px] h-8 bg-white" />
+                  <p className="text-[#0A0A0A]/55 text-sm md:text-base">{stat.label}</p>
                 </div>
               </div>
             </div>
@@ -164,14 +157,14 @@ export function Stats() {
 
         {/* Bottom CTA */}
         <div className="mt-16 text-center">
-          <p className="text-white/60 mb-6">
+          <p className="text-[#0A0A0A]/50 mb-6">
             Faça parte dessa história de sucesso
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <a href="#eventos" className="btn-primary">
               Participar de Eventos
             </a>
-            <a href="#empresas" className="px-6 py-3 border border-white/20 text-white font-semibold rounded-lg hover:bg-white/5 transition-colors">
+            <a href="#empresas" className="px-6 py-3 border border-[#0A0A0A]/15 text-[#0A0A0A] font-semibold rounded-lg hover:bg-[#0A0A0A]/5 transition-colors">
               Seja um Parceiro
             </a>
           </div>

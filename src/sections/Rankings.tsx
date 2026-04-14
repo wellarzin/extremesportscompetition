@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { rankingsConfig } from '../config';
-import { Trophy, Medal, Award, TrendingUp, Clock, Activity, Ruler } from 'lucide-react';
+import { Trophy, Medal, Award, TrendingUp } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -11,7 +11,6 @@ export function Rankings() {
   const titleRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [activeFormat, setActiveFormat] = useState<'tempo' | 'movimentos' | 'distancia'>('tempo');
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -53,26 +52,6 @@ export function Rankings() {
     return () => ctx.revert();
   }, []);
 
-  const scoringFormats = {
-    tempo: {
-      icon: Clock,
-      title: 'Tempo',
-      description: 'Classificação baseada no menor ou maior tempo de execução.',
-      modes: ['Menor tempo vence', 'Maior tempo vence']
-    },
-    movimentos: {
-      icon: Activity,
-      title: 'Movimentos',
-      description: 'Classificação baseada no número de repetições ou movimentos.',
-      modes: ['Maior número vence', 'Menor número vence']
-    },
-    distancia: {
-      icon: Ruler,
-      title: 'Distância',
-      description: 'Classificação baseada na distância percorrida.',
-      modes: ['Maior distância vence', 'Menor distância vence']
-    }
-  };
 
   return (
     <section
@@ -99,33 +78,7 @@ export function Rankings() {
         </div>
 
         {/* Scoring System */}
-        <div ref={contentRef} className="space-y-12">
-          {/* Format Selector */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Object.entries(scoringFormats).map(([key, format]) => {
-              const Icon = format.icon;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setActiveFormat(key as typeof activeFormat)}
-                  className={`p-6 rounded-2xl border transition-all duration-300 text-left ${
-                    activeFormat === key
-                      ? 'bg-[#4169E1]/20 border-[#4169E1]'
-                      : 'bg-white/5 border-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
-                    activeFormat === key ? 'bg-[#4169E1]' : 'bg-white/10'
-                  }`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">{format.title}</h3>
-                  <p className="text-white/60 text-sm">{format.description}</p>
-                </button>
-              );
-            })}
-          </div>
-
+        <div ref={contentRef} className="space-y-8">
           {/* Ranking Categories Tabs */}
           <div className="flex flex-wrap gap-2 justify-center">
             {rankingsConfig.categories.map((category, index) => (
