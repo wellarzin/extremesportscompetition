@@ -1,0 +1,260 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* EXTREME SPORTS COMPETITION - Color System */
+    /* Cores: Azul Royal (#4169E1), Laranja (#FF6B00), Preto (#0A0A0A) */
+    --background: 0 0% 4%; /* #0A0A0A */
+    --foreground: 0 0% 96%; /* #f4f4f4 */
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 225 73% 57%; /* #4169E1 - Azul Royal */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 24 100% 50%; /* #FF6B00 - Laranja */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 225 73% 57%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 100% / 0.1;
+    --input: 0 0% 15%;
+    --ring: 225 73% 57%;
+    --radius: 0.5rem;
+    
+    /* Custom properties - Extreme Sports */
+    --extreme-black: #0A0A0A;
+    --extreme-dark: #141414;
+    --extreme-gray: #1F1F1F;
+    --extreme-royal: #4169E1;
+    --extreme-royal-light: #5A7FE8;
+    --extreme-orange: #FF6B00;
+    --extreme-orange-light: #FF8533;
+    --extreme-white: #FFFFFF;
+    --extreme-offwhite: #F4F4F4;
+  }
+
+  .light-section {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 98%;
+    --card-foreground: 0 0% 10%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --border: 0 0% 0% / 0.08;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'DM Sans', sans-serif;
+    overflow-x: hidden;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Manrope', sans-serif;
+  }
+  
+  .font-serif {
+    font-family: 'Playfair Display', serif;
+  }
+  
+  .font-sans {
+    font-family: 'Manrope', sans-serif;
+  }
+  
+  .font-body {
+    font-family: 'DM Sans', sans-serif;
+  }
+}
+
+@layer components {
+  /* Gradient text effect */
+  .gradient-text {
+    background: linear-gradient(135deg, var(--extreme-royal) 0%, var(--extreme-orange) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Gradient border effect */
+  .gradient-border {
+    position: relative;
+    background: var(--extreme-dark);
+  }
+  
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 2px;
+    background: linear-gradient(135deg, var(--extreme-royal) 0%, var(--extreme-orange) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    border-radius: inherit;
+  }
+  
+  /* Button styles */
+  .btn-primary {
+    @apply px-6 py-3 bg-[#4169E1] text-white font-semibold rounded-lg transition-all duration-300;
+  }
+  
+  .btn-primary:hover {
+    @apply bg-[#5A7FE8] shadow-lg shadow-[#4169E1]/30;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 bg-[#FF6B00] text-white font-semibold rounded-lg transition-all duration-300;
+  }
+  
+  .btn-secondary:hover {
+    @apply bg-[#FF8533] shadow-lg shadow-[#FF6B00]/30;
+  }
+  
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+  
+  .card-hover:hover {
+    @apply transform -translate-y-2 shadow-xl;
+    box-shadow: 0 20px 40px rgba(65, 105, 225, 0.2);
+  }
+  
+  /* Viewfinder overlay effect */
+  .viewfinder {
+    position: relative;
+  }
+  
+  .viewfinder::before,
+  .viewfinder::after {
+    content: "";
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    pointer-events: none;
+    z-index: 10;
+    transition: all 0.3s ease;
+  }
+  
+  .viewfinder::before {
+    top: 16px;
+    left: 16px;
+    border-top: 2px solid var(--extreme-royal);
+    border-left: 2px solid var(--extreme-royal);
+  }
+  
+  .viewfinder::after {
+    bottom: 16px;
+    right: 16px;
+    border-bottom: 2px solid var(--extreme-orange);
+    border-right: 2px solid var(--extreme-orange);
+  }
+  
+  /* Geometric card shape */
+  .geo-card {
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+  }
+  
+  /* Online users badge */
+  .online-badge {
+    @apply flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium;
+    background: rgba(65, 105, 225, 0.2);
+    border: 1px solid rgba(65, 105, 225, 0.3);
+  }
+  
+  .online-dot {
+    @apply w-2 h-2 rounded-full bg-green-500 animate-pulse;
+  }
+  
+  /* Section divider */
+  .section-divider {
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, var(--extreme-royal) 50%, var(--extreme-orange) 100%, transparent 100%);
+  }
+  
+  /* Glass effect */
+  .glass {
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Glow effect */
+  .glow-royal {
+    box-shadow: 0 0 30px rgba(65, 105, 225, 0.4);
+  }
+  
+  .glow-orange {
+    box-shadow: 0 0 30px rgba(255, 107, 0, 0.4);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .tracking-tight {
+    letter-spacing: -0.025em;
+  }
+  
+  .tracking-tighter {
+    letter-spacing: -0.05em;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--extreme-black);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--extreme-royal) 0%, var(--extreme-orange) 100%);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--extreme-royal);
+  }
+  
+  /* Swiper Styles */
+  .swiper {
+    overflow: visible !important;
+  }
+  
+  .swiper-pagination {
+    bottom: 0 !important;
+  }
+  
+  .swiper-pagination-bullet {
+    background: rgba(255, 255, 255, 0.3);
+    opacity: 1;
+    transition: all 0.3s ease;
+  }
+  
+  .swiper-pagination-bullet-active {
+    background: #FF6B00;
+    width: 24px;
+    border-radius: 4px;
+  }
+}
