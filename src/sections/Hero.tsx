@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { heroConfig } from '../config';
-import { Menu, X, User, Lock } from 'lucide-react';
+import { Menu, X, User, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -171,6 +171,22 @@ export function Hero() {
           </div>
         </div>
       </div>
+
+      {/* Prev / Next Arrows */}
+      <button
+        onClick={() => setCurrentSlide((prev) => (prev - 1 + heroConfig.slides.length) % heroConfig.slides.length)}
+        aria-label="Slide anterior"
+        className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/15 hover:bg-white/20 hover:border-white/30 transition-all duration-200"
+      >
+        <ChevronLeft className="w-5 h-5 text-white" />
+      </button>
+      <button
+        onClick={() => setCurrentSlide((prev) => (prev + 1) % heroConfig.slides.length)}
+        aria-label="Próximo slide"
+        className="absolute right-4 md:right-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/15 hover:bg-white/20 hover:border-white/30 transition-all duration-200"
+      >
+        <ChevronRight className="w-5 h-5 text-white" />
+      </button>
 
       {/* Slide Indicators */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3">

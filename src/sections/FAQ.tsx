@@ -79,7 +79,7 @@ export function FAQ() {
   return (
     <section
       ref={sectionRef}
-      className="relative w-full py-24 md:py-32 bg-forest-dark"
+      className="relative w-full py-24 md:py-32 bg-[#0A0A0A]"
     >
       <div className="max-w-4xl mx-auto px-6 md:px-12">
         {/* Section Header */}
@@ -102,9 +102,9 @@ export function FAQ() {
                 key={faq.id}
                 value={faq.id}
                 data-faq-item
-                className="opacity-0 border-0 bg-forest-mid/50 rounded-lg overflow-hidden"
+                className="opacity-0 border-0 bg-white/[0.04] rounded-lg overflow-hidden"
               >
-                <AccordionTrigger className="px-6 py-5 hover:no-underline hover:bg-forest-mid/80 transition-colors duration-300 group">
+                <AccordionTrigger className="px-6 py-5 hover:no-underline hover:bg-white/[0.06] transition-colors duration-300 group">
                   <span className="text-left font-sans font-medium text-white text-base md:text-lg pr-4 group-hover:text-white/90">
                     {faq.question}
                   </span>
@@ -130,7 +130,7 @@ export function FAQ() {
             {faqConfig.ctaButtonText && (
               <a
                 href={faqConfig.ctaHref || '#contact'}
-                className="inline-flex items-center gap-2 px-8 py-4 bg-white text-forest-dark font-sans font-semibold text-sm rounded-full hover:bg-offwhite transition-colors duration-300"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-[#FF6B00] text-white font-sans font-semibold text-sm rounded-full hover:bg-[#FF8533] transition-colors duration-300"
               >
                 {faqConfig.ctaButtonText}
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -118,27 +118,6 @@ export function Footer() {
               </div>
             </div>
 
-            {/* Department Emails */}
-            <div className="mt-6 pt-6 border-t border-white/5">
-              <p className="text-white/40 text-sm mb-3">Departamentos</p>
-              <div className="space-y-2">
-                {[
-                  { label: 'Projetos', email: 'projetos@extremesportscompetition.com' },
-                  { label: 'SAC', email: 'sac@extremesportscompetition.com' },
-                  { label: 'Financeiro', email: 'financeiro@extremesportscompetition.com' },
-                  { label: 'Eventos', email: 'eventos@extremesportscompetition.com' }
-                ].map((dept) => (
-                  <a
-                    key={dept.label}
-                    href={`mailto:${dept.email}`}
-                    className="flex items-center gap-2 text-white/40 hover:text-[#FF6B00] text-sm transition-colors"
-                  >
-                    <span>{dept.label}:</span>
-                    <span className="truncate">{dept.email}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Newsletter */}
