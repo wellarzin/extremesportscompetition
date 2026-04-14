@@ -595,6 +595,31 @@ export const faqConfig: FAQConfig = {
   ]
 };
 
+// Brands Ticker Configuration
+export interface Brand {
+  name: string;
+  logoUrl?: string; // caminho em /public/brands/ — se vazio, renderiza nome estilizado
+}
+
+export interface BrandsConfig {
+  brands: Brand[];
+}
+
+export const brandsConfig: BrandsConfig = {
+  brands: [
+    { name: 'iFood' },
+    { name: 'Uber Eats' },
+    { name: 'Rappi' },
+    { name: '99' },
+    { name: 'Loggi' },
+    { name: 'Red Bull' },
+    { name: 'Nike' },
+    { name: 'Adidas' },
+    { name: 'Decathlon' },
+    { name: 'Wellhub' },
+  ]
+};
+
 // Footer Configuration
 export interface SocialLink {
   iconName: string;
@@ -624,7 +649,7 @@ export interface FooterConfig {
 export const footerConfig: FooterConfig = {
   logoText: "EXTREME SPORTS",
   contactLabel: "Contato",
-  email: "contato@extremesportscompetition.com",
+  email: "extremesportscompetition@gmail.com",
   locationText: "São Paulo, SP - Brasil",
   navigationLabel: "Navegação",
   navLinks: [
@@ -640,13 +665,13 @@ export const footerConfig: FooterConfig = {
     { iconName: "Instagram", href: "https://instagram.com", label: "Instagram" },
     { iconName: "Twitter", href: "https://twitter.com", label: "Twitter" },
     { iconName: "Linkedin", href: "https://linkedin.com", label: "LinkedIn" },
-    { iconName: "Mail", href: "mailto:contato@extremesportscompetition.com", label: "Email" }
+    { iconName: "Mail", href: "extremesportscompetition@gmail.com", label: "Email" }
   ],
   tagline: "Saúde e movimento para quem move o mundo.\nSeja Extreme.",
   copyright: "© 2026 Extreme Sports Competition. Todos os direitos reservados.",
   bottomLinks: [
     { label: "Política de Privacidade", href: "#" },
     { label: "Termos de Uso", href: "#" },
-    { label: "SAC", href: "mailto:sac@extremesportscompetition.com" }
+    { label: "SAC", href: "extremesportscompetition@gmail.com" }
   ]
 };

@@ -206,6 +206,47 @@
   }
 }
 
+/* Testimonials dual-row marquee */
+@keyframes marquee-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes marquee-right {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}
+
+.testimonial-left {
+  width: max-content;
+  animation: marquee-left 50s linear infinite;
+}
+
+.testimonial-right {
+  width: max-content;
+  animation: marquee-right 55s linear infinite;
+}
+
+.testimonial-left:hover,
+.testimonial-right:hover {
+  animation-play-state: paused;
+}
+
+/* Brands ticker infinite scroll */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.ticker-track {
+  width: max-content;
+  animation: ticker-scroll 35s linear infinite;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
