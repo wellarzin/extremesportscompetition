@@ -70,7 +70,7 @@ export function Events() {
     switch (format) {
       case 'online': return 'bg-[#4169E1]/20 text-[#4169E1]';
       case 'presencial': return 'bg-[#FF6B00]/20 text-[#FF6B00]';
-      case 'hibrido': return 'bg-purple-500/20 text-purple-400';
+      case 'hibrido': return 'bg-white/10 text-white/70';
       default: return 'bg-gray-500/20 text-gray-400';
     }
   };
@@ -107,7 +107,7 @@ export function Events() {
               className="event-card group relative bg-[#141414] rounded-2xl overflow-hidden border border-white/5 hover:border-[#4169E1]/30 transition-all duration-500"
             >
               {/* Image */}
-              <div className="relative h-48 overflow-hidden">
+              <div className="relative h-64 overflow-hidden">
                 <img
                   src={event.image}
                   alt={event.title}
@@ -147,9 +147,13 @@ export function Events() {
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                   <div>
                     <span className="text-white/40 text-sm">Inscrição</span>
-                    <p className="text-2xl font-bold text-white">
-                      R$ {event.price.toFixed(2)}
-                    </p>
+                    {event.price === 0 ? (
+                      <p className="text-2xl font-bold text-[#00C45A]">Gratuito</p>
+                    ) : (
+                      <p className="text-2xl font-bold text-white">
+                        R$ {event.price.toFixed(2)}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => setSelectedEvent(event)}
