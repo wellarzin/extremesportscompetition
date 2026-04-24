@@ -60,7 +60,7 @@ export function Companies() {
     >
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A] via-[#0F1A0F] to-[#0A0A0A]" />
-      
+
       <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8">
         {/* Section Header */}
         <div ref={titleRef} className="text-center mb-16">
@@ -104,7 +104,7 @@ export function Companies() {
               <div className="p-6 bg-gradient-to-br from-[#FF6B00]/20 to-[#FF6B00]/5 rounded-2xl border border-[#FF6B00]/20">
                 <Phone className="w-8 h-8 text-[#FF6B00] mb-4" />
                 <h4 className="text-white font-semibold mb-2">Telefone</h4>
-                <p className="text-white/60 text-sm">+55 (11) 4000-0000</p>
+                <p className="text-white/60 text-sm">(51) 98148-4895</p>
               </div>
             </div>
 
@@ -154,18 +154,18 @@ export function Companies() {
       {/* Contact Form Modal */}
       {showForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div 
+          <div
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             onClick={() => setShowForm(false)}
           />
           <div className="relative w-full max-w-2xl max-h-[90vh] overflow-auto bg-[#141414] border border-white/10 rounded-2xl p-8">
-            <button 
+            <button
               onClick={() => setShowForm(false)}
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
             >
               <X className="w-5 h-5 text-white/60" />
             </button>
-            
+
             <div className="mb-8">
               <h2 className="text-2xl font-sans font-bold text-white mb-2">
                 Solicitar Orçamento
@@ -182,7 +182,7 @@ export function Companies() {
                   <label className="block text-sm text-white/60 mb-2">Nome da Empresa</label>
                   <div className="relative">
                     <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <input 
+                    <input
                       type="text"
                       placeholder="Sua empresa"
                       className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
@@ -191,7 +191,7 @@ export function Companies() {
                 </div>
                 <div>
                   <label className="block text-sm text-white/60 mb-2">CNPJ</label>
-                  <input 
+                  <input
                     type="text"
                     placeholder="00.000.000/0000-00"
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
@@ -203,7 +203,7 @@ export function Companies() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-white/60 mb-2">Nome do Responsável</label>
-                  <input 
+                  <input
                     type="text"
                     placeholder="Nome completo"
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
@@ -213,7 +213,7 @@ export function Companies() {
                   <label className="block text-sm text-white/60 mb-2">Email</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <input 
+                    <input
                       type="email"
                       placeholder="email@empresa.com"
                       className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
@@ -244,7 +244,7 @@ export function Companies() {
                   <label className="block text-sm text-white/60 mb-2">Data Prevista</label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <input 
+                    <input
                       type="date"
                       className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4169E1] transition-colors"
                     />
@@ -258,7 +258,7 @@ export function Companies() {
                   <label className="block text-sm text-white/60 mb-2">Cidade</label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <input 
+                    <input
                       type="text"
                       placeholder="Cidade do evento"
                       className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
@@ -304,7 +304,7 @@ export function Companies() {
               {/* Message */}
               <div>
                 <label className="block text-sm text-white/60 mb-2">Mensagem (opcional)</label>
-                <textarea 
+                <textarea
                   rows={4}
                   placeholder="Descreva mais detalhes sobre o evento..."
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors resize-none"
@@ -312,7 +312,7 @@ export function Companies() {
               </div>
 
               {/* Submit */}
-              <button 
+              <button
                 type="submit"
                 onClick={(e) => {
                   e.preventDefault();

@@ -62,7 +62,7 @@ export const heroConfig: HeroConfig = {
     { label: "Home", href: "#home" },
     { label: "Eventos", href: "#eventos" },
     { label: "Profissionais", href: "#atletas" },
-    { label: "Rankings", href: "#rankings" },
+    // { label: "Rankings", href: "#rankings" },
     { label: "Loja", href: "#loja" },
     { label: "Empresas", href: "#empresas" }
   ],
@@ -656,7 +656,7 @@ export const footerConfig: FooterConfig = {
     { label: "Home", href: "#home" },
     { label: "Eventos", href: "#eventos" },
     { label: "Profissionais", href: "#atletas" },
-    { label: "Rankings", href: "#rankings" },
+    // { label: "Rankings", href: "#rankings" },
     { label: "Loja", href: "#loja" },
     { label: "Empresas", href: "#empresas" }
   ],
