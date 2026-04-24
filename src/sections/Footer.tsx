@@ -114,42 +114,12 @@ export function Footer() {
               </div>
               <div className="flex items-center gap-3 text-white/60">
                 <Phone className="w-5 h-5" />
-                <span>+55 (11) 4000-0000</span>
+                <span>+55 (51) 98148-4895</span>
               </div>
             </div>
 
           </div>
 
-          {/* Newsletter */}
-          <div>
-            <h4 className="text-white font-semibold mb-6">Newsletter</h4>
-            <p className="text-white/60 mb-4">
-              Receba as últimas novidades sobre eventos e competições.
-            </p>
-            <form className="space-y-3" onSubmit={(e) => {
-              e.preventDefault();
-              alert('Inscrição realizada com sucesso!');
-            }}>
-              <input
-                type="email"
-                placeholder="Seu email"
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
-              />
-              <button
-                type="submit"
-                className="w-full btn-primary"
-              >
-                Inscrever-se
-              </button>
-            </form>
-
-            {/* Tagline */}
-            <div className="mt-8 p-4 bg-gradient-to-r from-[#4169E1]/10 to-[#FF6B00]/10 rounded-xl border border-white/5">
-              <p className="text-white/80 text-sm italic text-center">
-                "{footerConfig.tagline.replace(/\n/g, ' ')}"
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 

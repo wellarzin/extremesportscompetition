@@ -569,8 +569,8 @@ export const faqConfig: FAQConfig = {
   faqs: [
     {
       id: "1",
-      question: "Quem pode participar dos eventos?",
-      answer: "Todos os eventos da Extreme Sports Competition são exclusivos para trabalhadores por aplicativo (motoristas de app, entregadores de delivery, etc.). Basta apresentar um comprovante de trabalho no momento da inscrição."
+      question: "Quem pode participar do evento Rota da Saúde?",
+      answer: "Podem participar trabalhadores que utilizam aplicativos de mobilidade ou entrega, desde que comprovem atividade na plataforma e tenham no mínimo 200 corridas ou entregas realizadas. Não há limite de idade. Também é necessário realizar o cadastro e efetuar o pagamento da taxa de participação."
     },
     {
       id: "2",
@@ -580,17 +580,17 @@ export const faqConfig: FAQConfig = {
     {
       id: "3",
       question: "Os eventos são gratuitos?",
-      answer: "Temos eventos gratuitos (como as aulas de yoga e funcional) e eventos pagos (como as corridas). Os eventos pagos têm valores acessíveis e premiações em dinheiro para os vencedores."
+      answer: "Temos eventos gratuitos e eventos pagos. Os eventos pagos têm valores acessíveis e premiações em dinheiro para os vencedores."
     },
     {
       id: "4",
       question: "Como funciona o sistema de premiação?",
-      answer: "Os vencedores das competições recebem premiações em dinheiro. Além disso, os profissionais de Educação Física e Nutrição que prepararem os atletas campeões também recebem premiações exclusivas!"
+      answer: "O Rota da Saúde premia os participantes com base na evolução física ao longo do evento. Os melhores colocados no ranking geral — separados entre masculino e feminino — recebem premiações. Além disso, há premiações em eventos mensais e pontuação por desempenho em avaliações físicas."
     },
     {
       id: "5",
       question: "Como me tornar um profissional credenciado?",
-      answer: "Profissionais de Educação Física e Nutrição podem se credenciar enviando currículo para projetos@extremesportscompetition.com. Avaliamos a experiência e certificações para garantir a qualidade do atendimento."
+      answer: "Profissionais da saúde devem se cadastrar na plataforma, informar sua área de atuação, registro no conselho e pagar a taxa de adesão. Após aprovação, poderão atender participantes, divulgar seus serviços e também concorrer a premiações com base nos resultados obtidos com seus alunos."
     }
   ]
 };
@@ -649,8 +649,8 @@ export interface FooterConfig {
 export const footerConfig: FooterConfig = {
   logoText: "EXTREME SPORTS",
   contactLabel: "Contato",
-  email: "extremesportscompetition@gmail.com",
-  locationText: "São Paulo, SP - Brasil",
+  email: "extreme@extremesportscompetition.com",
+  locationText: "Porto Alegre, RS - Brasil",
   navigationLabel: "Navegação",
   navLinks: [
     { label: "Home", href: "#home" },
@@ -672,6 +672,6 @@ export const footerConfig: FooterConfig = {
   bottomLinks: [
     { label: "Política de Privacidade", href: "#" },
     { label: "Termos de Uso", href: "#" },
-    { label: "SAC", href: "extremesportscompetition@gmail.com" }
+    { label: "SAC", href: "extreme@extremesportscompetition.com" }
   ]
 };
