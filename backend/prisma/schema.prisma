@@ -473,6 +473,7 @@ model Payment {
   billing_id   String        @unique
   checkout_url String
   pix_code     String?
+  method       String        @default("pix") @db.VarChar(20)
   amount       Int
   status       PaymentStatus @default(pending)
   ticket_id    String?       @unique @db.Uuid
