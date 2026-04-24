@@ -24,8 +24,8 @@ export async function checkoutRoutes(app: FastifyInstance) {
         properties: {
           method: {
             type: "string",
-            enum: ["pix"],
-            description: "Método de pagamento (apenas PIX via AbacatePay)",
+            enum: ["pix", "credit_card"],
+            description: "Método de pagamento: pix (QR Code) ou credit_card (checkout hospedado AbacatePay)",
           },
         },
       },
