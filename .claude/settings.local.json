@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:docs.abacatepay.com)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:api-docs.abacatepay.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:abacatepay.readme.io)",
+      "Bash(curl -s https://raw.githubusercontent.com/AbacatePay/documentation/main/openapi.yaml)"
+    ]
+  }
+}

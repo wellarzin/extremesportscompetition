@@ -1,0 +1,559 @@
+// ============================================================
+// Extreme Competition — Prisma Schema
+// Banco: PostgreSQL (NeonDB)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  user
+  organizer
+  professional
+  admin
+}
+
+enum DocumentType {
+  cpf
+  rg
+}
+
+enum ShirtSize {
+  PP
+  P
+  M
+  G
+  GG
+  XG
+  XXG
+  PP_BABY
+  P_BABY
+  M_BABY
+  G_BABY
+  GG_BABY
+  XG_BABY
+  XXG_BABY
+}
+
+enum EducationLevel {
+  fundamental_incompleto
+  fundamental_completo
+  medio_incompleto
+  medio_completo
+  tecnico
+  superior_incompleto
+  superior_completo
+  pos_graduacao
+  mestrado
+  doutorado
+}
+
+enum Profession {
+  trabalhador_autonomo
+  educador_fisico
+  nutricionista
+  pedagogo
+  professor
+  profissional_ti
+  medico
+  enfermeiro
+  fisioterapeuta
+  psicologo
+  advogado
+  engenheiro
+  administrador
+  estudante
+  outros
+}
+
+enum Sport {
+  corrida
+  ciclismo
+  natacao
+  caminhada
+  volei
+  basquete
+  beach_tennis
+  patins
+  skate
+  crossfit
+  academia
+  escoteiro
+  outros
+}
+
+enum SportLevel {
+  iniciante
+  amador
+  competitivo
+  federado
+}
+
+enum PracticeTime {
+  menos_de_1_ano  @map("menos_de_1_ano")
+  um_a_3_anos     @map("1_a_3_anos")
+  tres_a_5_anos   @map("3_a_5_anos")
+  cinco_a_10_anos @map("5_a_10_anos")
+  mais_de_10_anos @map("mais_de_10_anos")
+}
+
+enum EducationSubject {
+  portugues
+  matematica
+  historia
+  geografia
+  fisica
+  quimica
+  artes
+  biologia
+  ingles
+  educacao_fisica
+  filosofia
+  sociologia
+  outros
+}
+
+enum EducationRole {
+  estudante
+  professor
+  mestre
+  doutor
+  estudioso
+}
+
+enum CultureArea {
+  danca
+  fotografia
+  pintura_em_quadros
+  design_desenhista
+  arte_de_rua
+  musica
+  literatura
+  cinema
+  teatro
+  artesanato
+  outros
+}
+
+enum EventCategory {
+  maratona
+  trail
+  ultramaratona
+  campeonato_crossfit
+  campeonato_natacao
+  campeonato_ciclismo
+  campeonato_volei
+  campeonato_basquete
+  beach_tennis
+  corrida_de_obstaculos
+  desafio_aberto
+  evento_recreativo
+  outros
+}
+
+enum EventModality {
+  presencial
+  online
+}
+
+enum EventStatus {
+  aberto
+  encerrado
+  esgotado
+  em_breve
+  cancelado
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  expired
+}
+
+enum TicketStatus {
+  ativo
+  cancelado
+  usado
+}
+
+enum RankingBadge {
+  ouro
+  prata
+  bronze
+}
+
+enum ProfessionalSpecialty {
+  hipertrofia
+  emagrecimento
+  funcional
+  resistencia
+  flexibilidade
+  reabilitacao
+  performance
+  nutricao_esportiva
+  suplementacao
+  psicologia_esportiva
+  preparacao_fisica
+  treinamento_de_forca
+  corrida_e_endurance
+  natacao
+  ciclismo
+  artes_marciais
+  crossfit
+  outros
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model User {
+  id                   String         @id @default(uuid()) @db.Uuid
+  full_name            String         @db.VarChar(255)
+  photo_url            String?
+  birth_date           DateTime       @db.Date
+  document_type        DocumentType
+  // Armazenado criptografado (AES-256-GCM). Format: iv:tag:ciphertext (hex)
+  document_number      String
+  // HMAC-SHA256 determinístico do documento normalizado — garante unicidade sem expor o valor
+  document_number_hash String         @unique
+  zip_code             String         @db.VarChar(10)
+  street               String         @db.VarChar(255)
+  neighborhood         String?        @db.VarChar(100)
+  city                 String         @db.VarChar(100)
+  state                String         @db.Char(2)
+  number               String         @db.VarChar(10)
+  complement           String?        @db.VarChar(100)
+  weight_kg            Decimal?       @db.Decimal(5, 2)
+  height_cm            Int?
+  shirt_size           ShirtSize
+  shoe_size            Decimal?       @db.Decimal(4, 1)
+  education_level      EducationLevel
+  profession           Profession
+  email                String         @unique @db.VarChar(255)
+  password_hash        String
+  role                 UserRole       @default(user)
+
+  // Verificação de e-mail
+  email_verified       Boolean        @default(false)
+  email_verified_at    DateTime?
+
+  // Proteção contra brute-force
+  login_attempts       Int            @default(0)
+  locked_until         DateTime?
+
+  // LGPD — consentimento explícito
+  consent_version      String?        @db.VarChar(10)
+  consent_given_at     DateTime?
+
+  // LGPD — requisição de exclusão com carência de 7 dias
+  deletion_requested_at DateTime?
+
+  created_at           DateTime       @default(now())
+  updated_at           DateTime       @updatedAt
+  deleted_at           DateTime?
+
+  sport_preferences         UserSportPreference[]
+  education_preferences     UserEducationPreference[]
+  culture_preferences       UserCulturePreference[]
+  organized_events          Event[]                    @relation("EventOrganizer")
+  tickets                   Ticket[]
+  waitlist                  Waitlist[]
+  rankings                  Ranking[]
+  professional              Professional?
+  refresh_tokens            RefreshToken[]
+  email_verification_tokens EmailVerificationToken[]
+  password_reset_tokens     PasswordResetToken[]
+  email_change_tokens       EmailChangeToken[]
+  payments                  Payment[]
+
+  @@index([email])
+  @@index([document_number_hash])
+  @@index([role])
+  @@index([deleted_at])
+  @@map("users")
+}
+
+// Refresh tokens com rotação e detecção de reutilização por família
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @db.Uuid
+  // SHA-256 do token bruto — nunca armazenar o valor raw
+  token_hash String    @unique
+  // UUID compartilhado por toda a cadeia de rotação; reuso de token revogado revoga a família inteira
+  family     String    @db.Uuid
+  revoked    Boolean   @default(false)
+  revoked_at DateTime?
+  expires_at DateTime
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([family])
+  @@index([expires_at])
+  @@map("refresh_tokens")
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @db.Uuid
+  token_hash String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @db.Uuid
+  token_hash String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("password_reset_tokens")
+}
+
+// Tokens para troca de e-mail (novo e-mail precisa ser verificado antes de ser aplicado)
+model EmailChangeToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String    @db.Uuid
+  new_email  String    @db.VarChar(255)
+  token_hash String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("email_change_tokens")
+}
+
+// ============================================================
+
+model UserSportPreference {
+  id            String       @id @default(uuid()) @db.Uuid
+  user_id       String       @db.Uuid
+  sport         Sport
+  level         SportLevel
+  practice_time PracticeTime
+  created_at    DateTime     @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("user_sport_preferences")
+}
+
+model UserEducationPreference {
+  id             String           @id @default(uuid()) @db.Uuid
+  user_id        String           @db.Uuid
+  subject        EducationSubject
+  education_role EducationRole
+  created_at     DateTime         @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("user_education_preferences")
+}
+
+model UserCulturePreference {
+  id           String      @id @default(uuid()) @db.Uuid
+  user_id      String      @db.Uuid
+  culture_area CultureArea
+  created_at   DateTime    @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("user_culture_preferences")
+}
+
+model Event {
+  id              String        @id @default(uuid()) @db.Uuid
+  organizer_id    String        @db.Uuid
+  title           String        @db.VarChar(255)
+  cover_image_url String?
+  category        EventCategory
+  modality        EventModality
+  start_datetime  DateTime
+  end_datetime    DateTime?
+  description     String
+  rules           String?
+  location        String?       @db.VarChar(255)
+  city            String?       @db.VarChar(100)
+  state           String?       @db.Char(2)
+  price_cents     Int           @default(0)
+  capacity        Int?
+  enrolled        Int           @default(0)
+  status          EventStatus   @default(aberto)
+  featured        Boolean       @default(false)
+  ranking_points  Int?
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+  deleted_at      DateTime?
+
+  organizer User       @relation("EventOrganizer", fields: [organizer_id], references: [id], onDelete: Restrict)
+  tickets   Ticket[]
+  waitlist  Waitlist[]
+  payments  Payment[]
+
+  @@index([organizer_id])
+  @@index([status])
+  @@index([featured])
+  @@index([category])
+  @@index([start_datetime])
+  @@index([deleted_at])
+  @@map("events")
+}
+
+model Ticket {
+  id               String       @id @default(uuid()) @db.Uuid
+  event_id         String       @db.Uuid
+  user_id          String       @db.Uuid
+  status           TicketStatus @default(ativo)
+  price_paid_cents Int
+  purchased_at     DateTime     @default(now())
+  used_at          DateTime?
+
+  event   Event    @relation(fields: [event_id], references: [id], onDelete: Restrict)
+  user    User     @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  payment Payment?
+
+  @@index([event_id])
+  @@index([user_id])
+  @@index([status])
+  @@map("tickets")
+}
+
+model Waitlist {
+  id            String   @id @default(uuid()) @db.Uuid
+  event_id      String   @db.Uuid
+  user_id       String   @db.Uuid
+  position      Int
+  registered_at DateTime @default(now())
+
+  event Event @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([event_id, user_id])
+  @@unique([event_id, position])
+  @@index([event_id])
+  @@index([user_id])
+  @@map("waitlist")
+}
+
+model Payment {
+  id           String        @id @default(uuid()) @db.Uuid
+  event_id     String        @db.Uuid
+  user_id      String        @db.Uuid
+  billing_id   String        @unique
+  checkout_url String
+  pix_code     String?
+  amount       Int
+  status       PaymentStatus @default(pending)
+  ticket_id    String?       @unique @db.Uuid
+  expires_at   DateTime
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+
+  event  Event   @relation(fields: [event_id], references: [id], onDelete: Restrict)
+  user   User    @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  ticket Ticket? @relation(fields: [ticket_id], references: [id])
+
+  @@index([user_id])
+  @@index([event_id])
+  @@index([status])
+  @@map("payments")
+}
+
+model Professional {
+  id                  String    @id @default(uuid()) @db.Uuid
+  user_id             String?   @unique @db.Uuid
+  photo_url           String?
+  full_name           String    @db.VarChar(255)
+  birth_date          DateTime  @db.Date
+  education           String    @db.VarChar(255)
+  registration_number String    @unique @db.VarChar(50)
+  registration_type   String    @db.VarChar(20)
+  bio                 String?
+  active              Boolean   @default(true)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  deleted_at          DateTime?
+
+  user        User?                     @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  specialties ProfessionalSpecialties[]
+
+  @@index([active])
+  @@index([deleted_at])
+  @@map("professionals")
+}
+
+model ProfessionalSpecialties {
+  id              String                @id @default(uuid()) @db.Uuid
+  professional_id String                @db.Uuid
+  specialty       ProfessionalSpecialty
+  notes           String?               @db.VarChar(255)
+
+  professional Professional @relation(fields: [professional_id], references: [id], onDelete: Cascade)
+
+  @@index([professional_id])
+  @@map("professional_specialties")
+}
+
+model Ranking {
+  id                  String        @id @default(uuid()) @db.Uuid
+  user_id             String        @db.Uuid
+  sport               Sport
+  points              Int           @default(0)
+  position            Int?
+  badge               RankingBadge?
+  events_participated Int           @default(0)
+  last_updated        DateTime      @default(now()) @updatedAt
+
+  user    User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  history RankingHistory[]
+
+  @@unique([user_id, sport])
+  @@index([sport, points(sort: Desc)])
+  @@index([user_id])
+  @@map("rankings")
+}
+
+model RankingHistory {
+  id                String   @id @default(uuid()) @db.Uuid
+  ranking_id        String   @db.Uuid
+  previous_position Int
+  new_position      Int
+  changed_at        DateTime @default(now())
+
+  ranking Ranking @relation(fields: [ranking_id], references: [id], onDelete: Cascade)
+
+  @@index([ranking_id])
+  @@index([changed_at])
+  @@map("ranking_history")
+}
