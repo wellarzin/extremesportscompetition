@@ -2,15 +2,33 @@ import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { companiesConfig } from '../config';
-import { Check, Building2, Mail, Phone, MapPin, X, Send, Briefcase, Calendar, DollarSign } from 'lucide-react';
+import { Check, Building2, Mail, Phone, MapPin, X, Send, Briefcase, Calendar, DollarSign, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { sendPartnerContact } from '../lib/api';
 
 gsap.registerPlugin(ScrollTrigger);
+
+// Estado inicial do formulário
+const initialFormState = {
+  companyName: '',
+  cnpj: '',
+  contactName: '',
+  contactEmail: '',
+  eventType: '',
+  eventDate: '',
+  city: '',
+  budget: '',
+  services: [] as string[],
+  message: '',
+};
 
 export function Companies() {
   const sectionRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(initialFormState);
+  const [sending, setSending] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -51,6 +69,87 @@ export function Companies() {
 
     return () => ctx.revert();
   }, []);
+
+  // Atualiza campo de texto do formulário
+  const updateField = (field: keyof typeof initialFormState, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Toggle de serviços (checkbox)
+  const toggleService = (service: string) => {
+    setForm(prev => ({
+      ...prev,
+      services: prev.services.includes(service)
+        ? prev.services.filter(s => s !== service)
+        : [...prev.services, service],
+    }));
+  };
+
+  // Reset do formulário
+  const resetForm = () => {
+    setForm(initialFormState);
+    setFeedback(null);
+  };
+
+  // Fecha o modal
+  const closeModal = () => {
+    setShowForm(false);
+    // Reset feedback ao fechar, mas mantém dados do formulário caso o user queira voltar
+    if (feedback?.type === 'success') {
+      resetForm();
+    }
+    setFeedback(null);
+  };
+
+  // Envia o formulário
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validação básica no frontend
+    if (!form.companyName.trim() || !form.contactName.trim() || !form.contactEmail.trim()) {
+      setFeedback({
+        type: 'error',
+        message: 'Preencha os campos obrigatórios: Nome da Empresa, Nome do Responsável e Email.',
+      });
+      return;
+    }
+
+    // Validação simples de email
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail)) {
+      setFeedback({
+        type: 'error',
+        message: 'Informe um email válido.',
+      });
+      return;
+    }
+
+    setSending(true);
+    setFeedback(null);
+
+    try {
+      const result = await sendPartnerContact({
+        company_name: form.companyName.trim(),
+        cnpj: form.cnpj.trim(),
+        contact_name: form.contactName.trim(),
+        contact_email: form.contactEmail.trim(),
+        event_type: form.eventType,
+        event_date: form.eventDate,
+        city: form.city.trim(),
+        budget: form.budget,
+        services: form.services,
+        message: form.message.trim(),
+      });
+
+      setFeedback({ type: 'success', message: result.message });
+      // Reset form após sucesso
+      setForm(initialFormState);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao enviar solicitação. Tente novamente.';
+      setFeedback({ type: 'error', message });
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <section
@@ -156,11 +255,12 @@ export function Companies() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            onClick={() => setShowForm(false)}
+            onClick={closeModal}
           />
           <div className="relative w-full max-w-2xl max-h-[90vh] overflow-auto bg-[#141414] border border-white/10 rounded-2xl p-8">
             <button
-              onClick={() => setShowForm(false)}
+              onClick={closeModal}
+              aria-label="Fechar formulário"
               className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
             >
               <X className="w-5 h-5 text-white/60" />
@@ -175,156 +275,217 @@ export function Companies() {
               </p>
             </div>
 
-            <form className="space-y-6">
-              {/* Company Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Feedback de sucesso */}
+            {feedback?.type === 'success' && (
+              <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-xl flex items-start gap-3">
+                <CheckCircle className="w-6 h-6 text-green-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <label className="block text-sm text-white/60 mb-2">Nome da Empresa</label>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                  <p className="text-green-400 font-medium">{feedback.message}</p>
+                  <p className="text-green-400/60 text-sm mt-1">
+                    Um email de confirmação foi enviado para o endereço informado.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Feedback de erro */}
+            {feedback?.type === 'error' && (
+              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
+                <AlertCircle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-red-400">{feedback.message}</p>
+              </div>
+            )}
+
+            {feedback?.type !== 'success' && (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Company Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Nome da Empresa *</label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                      <input
+                        type="text"
+                        placeholder="Sua empresa"
+                        value={form.companyName}
+                        onChange={(e) => updateField('companyName', e.target.value)}
+                        required
+                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">CNPJ</label>
                     <input
                       type="text"
-                      placeholder="Sua empresa"
-                      className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
+                      placeholder="00.000.000/0000-00"
+                      value={form.cnpj}
+                      onChange={(e) => updateField('cnpj', e.target.value)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">CNPJ</label>
-                  <input
-                    type="text"
-                    placeholder="00.000.000/0000-00"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
-                  />
-                </div>
-              </div>
 
-              {/* Contact Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">Nome do Responsável</label>
-                  <input
-                    type="text"
-                    placeholder="Nome completo"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">Email</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <input
-                      type="email"
-                      placeholder="email@empresa.com"
-                      className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Event Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">Tipo de Evento</label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <select className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4169E1] transition-colors appearance-none">
-                      <option value="">Selecione...</option>
-                      <option value="skate">Skate</option>
-                      <option value="bmx">BMX</option>
-                      <option value="surfe">Surfe</option>
-                      <option value="parkour">Parkour</option>
-                      <option value="motocross">Motocross</option>
-                      <option value="escalada">Escalada</option>
-                      <option value="outro">Outro</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">Data Prevista</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <input
-                      type="date"
-                      className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4169E1] transition-colors"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Location & Budget */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">Cidade</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                {/* Contact Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Nome do Responsável *</label>
                     <input
                       type="text"
-                      placeholder="Cidade do evento"
-                      className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
+                      placeholder="Nome completo"
+                      value={form.contactName}
+                      onChange={(e) => updateField('contactName', e.target.value)}
+                      required
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">Orçamento Estimado</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
-                    <select className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4169E1] transition-colors appearance-none">
-                      <option value="">Selecione...</option>
-                      <option value="ate-50k">Até R$ 50.000</option>
-                      <option value="50k-100k">R$ 50.000 - R$ 100.000</option>
-                      <option value="100k-250k">R$ 100.000 - R$ 250.000</option>
-                      <option value="250k-500k">R$ 250.000 - R$ 500.000</option>
-                      <option value="acima-500k">Acima de R$ 500.000</option>
-                    </select>
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Email *</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                      <input
+                        type="email"
+                        placeholder="email@empresa.com"
+                        value={form.contactEmail}
+                        onChange={(e) => updateField('contactEmail', e.target.value)}
+                        required
+                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Services */}
-              <div>
-                <label className="block text-sm text-white/60 mb-3">Serviços Desejados</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    'Planejamento Completo',
-                    'Sistema de Apuração',
-                    'Transmissão Ao Vivo',
-                    'Marketing',
-                    'Equipe Técnica',
-                    'Infraestrutura'
-                  ].map((service) => (
-                    <label key={service} className="flex items-center gap-3 p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors">
-                      <input type="checkbox" className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#4169E1] focus:ring-[#4169E1]" />
-                      <span className="text-white/80 text-sm">{service}</span>
-                    </label>
-                  ))}
+                {/* Event Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="partner-event-type" className="block text-sm text-white/60 mb-2">Tipo de Evento</label>
+                    <div className="relative">
+                      <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                      <select
+                        id="partner-event-type"
+                        value={form.eventType}
+                        onChange={(e) => updateField('eventType', e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4169E1] transition-colors appearance-none"
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="skate">Skate</option>
+                        <option value="bmx">BMX</option>
+                        <option value="surfe">Surfe</option>
+                        <option value="parkour">Parkour</option>
+                        <option value="motocross">Motocross</option>
+                        <option value="escalada">Escalada</option>
+                        <option value="outro">Outro</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="partner-event-date" className="block text-sm text-white/60 mb-2">Data Prevista</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                      <input
+                        id="partner-event-date"
+                        type="date"
+                        value={form.eventDate}
+                        onChange={(e) => updateField('eventDate', e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4169E1] transition-colors"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Message */}
-              <div>
-                <label className="block text-sm text-white/60 mb-2">Mensagem (opcional)</label>
-                <textarea
-                  rows={4}
-                  placeholder="Descreva mais detalhes sobre o evento..."
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors resize-none"
-                />
-              </div>
+                {/* Location & Budget */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Cidade</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                      <input
+                        type="text"
+                        placeholder="Cidade do evento"
+                        value={form.city}
+                        onChange={(e) => updateField('city', e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="partner-budget" className="block text-sm text-white/60 mb-2">Orçamento Estimado</label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                      <select
+                        id="partner-budget"
+                        value={form.budget}
+                        onChange={(e) => updateField('budget', e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#4169E1] transition-colors appearance-none"
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="ate-50k">Até R$ 50.000</option>
+                        <option value="50k-100k">R$ 50.000 - R$ 100.000</option>
+                        <option value="100k-250k">R$ 100.000 - R$ 250.000</option>
+                        <option value="250k-500k">R$ 250.000 - R$ 500.000</option>
+                        <option value="acima-500k">Acima de R$ 500.000</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
 
-              {/* Submit */}
-              <button
-                type="submit"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert('Solicitação enviada com sucesso! Nossa equipe entrará em contato em até 24 horas.');
-                  setShowForm(false);
-                }}
-                className="w-full btn-secondary flex items-center justify-center gap-2"
-              >
-                <Send className="w-5 h-5" />
-                Enviar Solicitação
-              </button>
-            </form>
+                {/* Services */}
+                <div>
+                  <label className="block text-sm text-white/60 mb-3">Serviços Desejados</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      'Planejamento Completo',
+                      'Sistema de Apuração',
+                      'Transmissão Ao Vivo',
+                      'Marketing',
+                      'Equipe Técnica',
+                      'Infraestrutura'
+                    ].map((service) => (
+                      <label key={service} className="flex items-center gap-3 p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={form.services.includes(service)}
+                          onChange={() => toggleService(service)}
+                          className="w-4 h-4 rounded border-white/20 bg-white/5 text-[#4169E1] focus:ring-[#4169E1]"
+                        />
+                        <span className="text-white/80 text-sm">{service}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Message */}
+                <div>
+                  <label className="block text-sm text-white/60 mb-2">Mensagem (opcional)</label>
+                  <textarea
+                    rows={4}
+                    placeholder="Descreva mais detalhes sobre o evento..."
+                    value={form.message}
+                    onChange={(e) => updateField('message', e.target.value)}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-[#4169E1] transition-colors resize-none"
+                  />
+                </div>
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="w-full btn-secondary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sending ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      Enviar Solicitação
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
