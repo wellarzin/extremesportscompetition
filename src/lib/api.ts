@@ -340,3 +340,34 @@ export async function fetchLandingProfessionals(
     meta: res.meta!,
   };
 }
+
+// ============================================================
+// Landing — Contato de Parceria (público, sem auth)
+// ============================================================
+
+export interface PartnerContactData {
+  company_name: string;
+  cnpj: string;
+  contact_name: string;
+  contact_email: string;
+  event_type: string;
+  event_date: string;
+  city: string;
+  budget: string;
+  services: string[];
+  message: string;
+}
+
+export async function sendPartnerContact(
+  data: PartnerContactData,
+): Promise<{ message: string }> {
+  const res = await request<ApiResponse<{ message: string }>>(
+    '/api/v1/landing/contact',
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    },
+    false,
+  );
+  return res.data;
+}

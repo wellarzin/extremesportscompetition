@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma";
-import { sendSuccess, Errors } from "../lib/response";
+import { email } from "../lib/email";
+import { sendSuccess, sendError, Errors } from "../lib/response";
 import { errorSchema } from "../lib/swagger-schemas";
 
 // ============================================================
@@ -415,6 +416,103 @@ export async function landingRoutes(app: FastifyInstance) {
       if (!event) return Errors.notFound(reply, "Evento");
 
       return sendSuccess(reply, event);
+    },
+  });
+
+  // ----------------------------------------------------------
+  // POST /landing/contact — Formulário de parceria
+  // ----------------------------------------------------------
+  app.post("/contact", {
+    config: {
+      rateLimit: {
+        max: 3,
+        timeWindow: "1 minute",
+      },
+    },
+    schema: {
+      tags: ["🏠 Landing Page"],
+      summary: "Envia formulário de contato para parceria",
+      description: "Recebe os dados do formulário de parceria e envia emails de notificação para a equipe comercial e confirmação para o parceiro. Sem autenticação. Rate limited: 3 req/min.",
+      security: [],
+      body: {
+        type: "object",
+        required: ["company_name", "contact_name", "contact_email"],
+        properties: {
+          company_name: { type: "string", minLength: 1, maxLength: 200, description: "Nome da empresa" },
+          cnpj: { type: "string", maxLength: 20, description: "CNPJ da empresa" },
+          contact_name: { type: "string", minLength: 1, maxLength: 200, description: "Nome do responsável" },
+          contact_email: { type: "string", format: "email", description: "Email de contato" },
+          event_type: { type: "string", maxLength: 100, description: "Tipo de evento desejado" },
+          event_date: { type: "string", maxLength: 20, description: "Data prevista do evento" },
+          city: { type: "string", maxLength: 100, description: "Cidade do evento" },
+          budget: { type: "string", maxLength: 100, description: "Faixa de orçamento" },
+          services: {
+            type: "array",
+            items: { type: "string", maxLength: 100 },
+            maxItems: 10,
+            description: "Serviços desejados",
+          },
+          message: { type: "string", maxLength: 2000, description: "Mensagem adicional" },
+        },
+      },
+      response: {
+        200: {
+          description: "Solicitação enviada com sucesso",
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "object",
+              properties: {
+                message: { type: "string" },
+              },
+            },
+          },
+        },
+        422: errorSchema("Erro de validação"),
+        429: errorSchema("Limite de requisições atingido"),
+      },
+    },
+    handler: async (request, reply) => {
+      const body = request.body as {
+        company_name: string;
+        cnpj?: string;
+        contact_name: string;
+        contact_email: string;
+        event_type?: string;
+        event_date?: string;
+        city?: string;
+        budget?: string;
+        services?: string[];
+        message?: string;
+      };
+
+      try {
+        await email.sendPartnerContact({
+          companyName: body.company_name,
+          cnpj: body.cnpj ?? "",
+          contactName: body.contact_name,
+          contactEmail: body.contact_email,
+          eventType: body.event_type ?? "",
+          eventDate: body.event_date ?? "",
+          city: body.city ?? "",
+          budget: body.budget ?? "",
+          services: body.services ?? [],
+          message: body.message ?? "",
+        });
+
+        return sendSuccess(reply, {
+          message: "Solicitação enviada com sucesso! Nossa equipe entrará em contato em até 24 horas.",
+        });
+      } catch (err) {
+        request.log.error(err, "Erro ao enviar email de contato de parceria");
+        return sendError(
+          reply,
+          500,
+          "EMAIL_SEND_FAILED",
+          "Não foi possível enviar sua solicitação. Tente novamente ou entre em contato diretamente pelo email extremesportscompetition@gmail.com."
+        );
+      }
     },
   });
 }

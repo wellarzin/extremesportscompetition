@@ -7,7 +7,7 @@ import { Hero } from './sections/Hero';
 import { Stats } from './sections/Stats';
 import { Events } from './sections/Events';
 import { Athletes } from './sections/Athletes';
-import { Rankings } from './sections/Rankings';
+// import { Rankings } from './sections/Rankings';
 import { BrandsTicker } from './sections/BrandsTicker';
 import { Companies } from './sections/Companies';
 import { Testimonials } from './sections/Testimonials';
@@ -24,7 +24,7 @@ function LandingPage() {
       <Stats />
       <Events />
       <Athletes />
-      <Rankings />
+      {/* <Rankings /> */}
       <BrandsTicker />
       <Companies />
       <Testimonials />
