@@ -663,9 +663,7 @@ export const footerConfig: FooterConfig = {
   socialLabel: "Redes Sociais",
   socialLinks: [
     { iconName: "Instagram", href: "https://instagram.com", label: "Instagram" },
-    { iconName: "Twitter", href: "https://twitter.com", label: "Twitter" },
-    { iconName: "Linkedin", href: "https://linkedin.com", label: "LinkedIn" },
-    { iconName: "Mail", href: "extremesportscompetition@gmail.com", label: "Email" }
+    { iconName: "Mail", href: "mailto:suporte@extremesportscompetition.com", label: "Email" }
   ],
   tagline: "Saúde e movimento para quem move o mundo.\nSeja Extreme.",
   copyright: "© 2026 Extreme Sports Competition. Todos os direitos reservados.",
