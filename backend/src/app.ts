@@ -23,16 +23,27 @@ let redisClient: import("ioredis").Redis | undefined;
 async function buildRedis() {
   if (!env.REDIS_URL) {
     if (env.NODE_ENV === "production") {
-      console.warn("⚠️  REDIS_URL não configurado em produção. Rate limiting em memória.");
+      console.warn("⚠️  REDIS_URL não configurado. Rate limiting em memória.");
     }
     return undefined;
   }
   const { default: Redis } = await import("ioredis");
-  const client = new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
-  await client.connect().catch(() => {
-    console.warn("⚠️  Não foi possível conectar ao Redis. Rate limiting em memória.");
+  const client = new Redis(env.REDIS_URL, {
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+    retryStrategy: () => null, // não reconecta automaticamente
+    enableOfflineQueue: false,
   });
-  return client;
+  // Suprime erros de reconexão para não poluir os logs nem crashar o processo
+  client.on("error", () => {});
+  try {
+    await client.connect();
+    return client;
+  } catch {
+    console.warn("⚠️  Não foi possível conectar ao Redis. Rate limiting em memória.");
+    await client.quit().catch(() => {});
+    return undefined;
+  }
 }
 
 export async function buildApp() {
