@@ -6,7 +6,7 @@ import { eventsConfig } from '../config';
 import { useLandingEvents } from '../hooks/useLandingEvents';
 import { mediaUrl } from '../lib/utils';
 import type { LandingEvent } from '../types/api';
-import { Calendar, MapPin, ChevronLeft, ChevronRight, ArrowRight, RefreshCw } from 'lucide-react';
+import { Calendar, MapPin, ChevronLeft, ChevronRight, ArrowRight, RefreshCw, Gift } from 'lucide-react';
 import { useNavigation } from '../contexts/NavigationContext';
 import {
   EventDetailModal,
@@ -116,7 +116,7 @@ export function Events() {
         <div ref={titleRef} className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
           {/* Left: title block */}
           <div>
-            <span className="inline-block px-4 py-2 rounded-full bg-[#4169E1]/10 border border-[#4169E1]/20 text-[#4169E1] text-sm font-medium mb-5">
+            <span className="inline-block px-4 py-2 rounded-full bg-[#00FF87]/10 border border-[#00FF87]/20 text-[#00FF87] text-sm font-medium mb-5">
               {eventsConfig.subtitle}
             </span>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-sans font-bold text-white tracking-tight mb-4">
@@ -149,7 +149,7 @@ export function Events() {
 
             <button
               onClick={() => navigate('events')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#4169E1]/10 border border-[#4169E1]/25 text-[#4169E1] text-sm font-semibold hover:bg-[#4169E1]/20 hover:border-[#4169E1]/50 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#00FF87]/10 border border-[#00FF87]/20 text-[#00FF87] text-sm font-semibold hover:bg-[#00FF87]/20 hover:border-[#00FF87]/40 transition-all"
             >
               Mostrar todos
               <ArrowRight className="w-3.5 h-3.5" />
@@ -191,7 +191,7 @@ export function Events() {
                         key={event.id}
                         className="flex-[0_0_90%] min-w-0 pl-5 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%]"
                       >
-                        <div className="group relative bg-[#141414] rounded-2xl overflow-hidden border border-white/5 hover:border-[#4169E1]/30 transition-all duration-500 h-full">
+                        <div className="group relative bg-[#141414] rounded-2xl overflow-hidden border border-white/5 hover:border-[#00FF87]/20 transition-all duration-500 h-full">
                           {/* Image */}
                           <div className="relative h-56 overflow-hidden">
                             {mediaUrl(event.cover_image_url) ? (
@@ -229,7 +229,7 @@ export function Events() {
 
                           {/* Content */}
                           <div className="p-5">
-                            <h3 className="text-lg font-sans font-bold text-white mb-3 group-hover:text-[#4169E1] transition-colors line-clamp-2">
+                            <h3 className="text-lg font-sans font-bold text-white mb-3 group-hover:text-[#00FF87] transition-colors line-clamp-2">
                               {event.title}
                             </h3>
 
@@ -240,12 +240,16 @@ export function Events() {
                               </div>
                               {(event.city || event.location) && (
                                 <div className="flex items-center gap-2 text-white/60 text-sm">
-                                  <MapPin className="w-4 h-4 text-[#4169E1] flex-shrink-0" />
+                                  <MapPin className="w-4 h-4 text-[#FF6B00] flex-shrink-0" />
                                   <span className="truncate">
                                     {event.location ?? `${event.city}${event.state ? `, ${event.state}` : ''}`}
                                   </span>
                                 </div>
                               )}
+                              <div className="flex items-center gap-2 text-[#00FF87]/80 text-sm">
+                                <Gift className="w-4 h-4 flex-shrink-0" />
+                                <span className="truncate">{event.reward}</span>
+                              </div>
                             </div>
 
                             <div className="flex items-center justify-between pt-4 border-t border-white/5">

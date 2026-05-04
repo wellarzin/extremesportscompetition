@@ -4,11 +4,15 @@ import { createWriteStream, mkdirSync } from "fs";
 import { join } from "path";
 import { prisma } from "../lib/prisma";
 import { sendSuccess, Errors } from "../lib/response";
+import { env } from "../lib/env";
+import * as abacatepay from "../lib/abacatepay";
+import { activateProfessionalSubscription } from "./checkout.controller";
 import type {
   CreateProfessionalInput,
   UpdateProfessionalInput,
   AddSpecialtyInput,
   ListProfessionalsQueryInput,
+  ProfessionalSubscribeInput,
 } from "../schemas/professionals.schema";
 
 const PHOTOS_DIR = join(process.cwd(), "uploads", "professionals");
@@ -26,6 +30,337 @@ function detectMime(buf: Buffer): string | null {
     buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
   ) return "image/webp";
   return null;
+}
+
+// Preço mensal da assinatura profissional: R$ 49,90
+const PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS = 4990;
+// externalId fixo do produto no AbacatePay (evita criar produtos duplicados)
+const PROFESSIONAL_SUBSCRIPTION_PRODUCT_EXTERNAL_ID = "professional_subscription_monthly_v1";
+
+// ============================================================
+// POST /professionals/subscribe — qualquer usuário autenticado
+// Inicia assinatura mensal via cartão de crédito (AbacatePay)
+// O profissional é criado automaticamente ao receber o webhook
+// ============================================================
+
+export async function subscribeProfessional(
+  request: FastifyRequest<{ Body: ProfessionalSubscribeInput }>,
+  reply: FastifyReply,
+) {
+  if (!env.ABACATEPAY_API_KEY) {
+    return reply.status(503).send({
+      success: false,
+      error: { code: "PAYMENT_UNAVAILABLE", message: "Gateway de pagamento não configurado. Contate o suporte." },
+    });
+  }
+
+  const userId = request.user.sub;
+  const body = request.body;
+
+  // ---- 1. Verifica assinatura existente ----
+  const existing = await prisma.professionalSubscription.findUnique({
+    where: { user_id: userId },
+    select: { id: true, status: true, checkout_url: true, billing_id: true, registration_number: true },
+  });
+
+  if (existing) {
+    if (existing.status === "active") {
+      return Errors.conflict(reply, "Você já possui uma assinatura profissional ativa.");
+    }
+    if (existing.status === "pending_payment" && existing.checkout_url) {
+      // Retorna URL de checkout existente para o usuário continuar o pagamento
+      return sendSuccess(reply, {
+        subscription_id: existing.id,
+        checkout_url: existing.checkout_url,
+        amount_cents: PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
+        status: "pending_payment",
+        resumed: true,
+      }, 200);
+    }
+  }
+
+  // ---- 2. Verifica unicidade do registro ----
+  if (existing?.registration_number !== body.registration_number) {
+    const byRegNumber = await prisma.professionalSubscription.findUnique({
+      where: { registration_number: body.registration_number },
+      select: { user_id: true },
+    });
+    if (byRegNumber && byRegNumber.user_id !== userId) {
+      return Errors.conflict(reply, "Número de registro profissional já cadastrado por outro usuário.");
+    }
+
+    const proByRegNumber = await prisma.professional.findUnique({
+      where: { registration_number: body.registration_number },
+      select: { id: true },
+    });
+    if (proByRegNumber) {
+      return Errors.conflict(reply, "Número de registro profissional já cadastrado.");
+    }
+  }
+
+  // ---- 3. Cria ou atualiza registro de assinatura ----
+  let subscription: { id: string };
+
+  if (existing) {
+    // Reativa assinatura cancelada
+    subscription = await prisma.professionalSubscription.update({
+      where: { id: existing.id },
+      data: {
+        full_name: body.full_name,
+        birth_date: new Date(body.birth_date),
+        education: body.education,
+        registration_number: body.registration_number,
+        registration_type: body.registration_type,
+        bio: body.bio ?? null,
+        billing_id: null,
+        checkout_url: null,
+        amount_cents: PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
+        status: "pending_payment",
+        specialties: {
+          deleteMany: {},
+          create: body.specialties.map((s) => ({ specialty: s.specialty, notes: s.notes })),
+        },
+      },
+      select: { id: true },
+    });
+  } else {
+    subscription = await prisma.professionalSubscription.create({
+      data: {
+        user_id: userId,
+        full_name: body.full_name,
+        birth_date: new Date(body.birth_date),
+        education: body.education,
+        registration_number: body.registration_number,
+        registration_type: body.registration_type,
+        bio: body.bio ?? null,
+        amount_cents: PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
+        status: "pending_payment",
+        specialties: {
+          create: body.specialties.map((s) => ({ specialty: s.specialty, notes: s.notes })),
+        },
+      },
+      select: { id: true },
+    });
+  }
+
+  // ---- 4. Localiza ou cria produto de assinatura no AbacatePay ----
+  let productId: string;
+  try {
+    productId = await abacatepay.findOrCreateSubscriptionProduct(
+      env.ABACATEPAY_API_KEY,
+      env.ABACATEPAY_BASE_URL,
+      PROFESSIONAL_SUBSCRIPTION_PRODUCT_EXTERNAL_ID,
+      "Assinatura Profissional — Mensal",
+      PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
+      "MONTHLY",
+    );
+  } catch (err) {
+    await prisma.professionalSubscription.delete({ where: { id: subscription.id } }).catch(() => {});
+    request.log.error(err, "AbacatePay: falha ao criar/localizar produto de assinatura");
+    return Errors.internal(reply);
+  }
+
+  // ---- 5. Cria checkout de assinatura ----
+  let checkout: abacatepay.AbacateSubscriptionCheckout;
+  try {
+    checkout = await abacatepay.createSubscriptionCheckout(
+      env.ABACATEPAY_API_KEY,
+      env.ABACATEPAY_BASE_URL,
+      {
+        productId,
+        externalId: subscription.id,
+        completionUrl: `${env.FRONTEND_URL}?pro_subscribed=1`,
+        returnUrl: `${env.FRONTEND_URL}#atletas`,
+      },
+    );
+  } catch (err) {
+    await prisma.professionalSubscription.delete({ where: { id: subscription.id } }).catch(() => {});
+    request.log.error(err, "AbacatePay: falha ao criar checkout de assinatura");
+    return Errors.internal(reply);
+  }
+
+  // ---- 6. Atualiza registro com billing info ----
+  await prisma.professionalSubscription.update({
+    where: { id: subscription.id },
+    data: {
+      billing_id: checkout.id,
+      checkout_url: checkout.url,
+    },
+  });
+
+  return sendSuccess(reply, {
+    subscription_id: subscription.id,
+    checkout_url: checkout.url,
+    amount_cents: PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
+    status: "pending_payment",
+  }, 201);
+}
+
+// ============================================================
+// POST /professionals/subscribe/photo — usuário autenticado
+// Upload de foto de perfil para a assinatura pendente
+// A foto é copiada para o Professional quando a assinatura é ativada
+// ============================================================
+
+export async function uploadSubscriptionPhoto(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const userId = request.user.sub;
+
+  const subscription = await prisma.professionalSubscription.findUnique({
+    where: { user_id: userId },
+    select: { id: true, status: true },
+  });
+
+  if (!subscription) return Errors.notFound(reply, "Assinatura profissional");
+  if (subscription.status !== "pending_payment" && subscription.status !== "active") {
+    return Errors.conflict(reply, "Não é possível atualizar a foto neste estado da assinatura.");
+  }
+
+  const data = await (request as any).file({ limits: { fileSize: 5 * 1024 * 1024 } });
+
+  if (!data) {
+    return Errors.validation(reply, [{ field: "file", message: "Arquivo não encontrado na requisição." }]);
+  }
+
+  const chunks: Buffer[] = [];
+  let totalSize = 0;
+
+  for await (const chunk of data.file) {
+    chunks.push(chunk as Buffer);
+    totalSize += (chunk as Buffer).length;
+    if (totalSize > 5 * 1024 * 1024) {
+      return Errors.validation(reply, [{ field: "file", message: "Arquivo excede 5 MB." }]);
+    }
+  }
+
+  const fullBuffer = Buffer.concat(chunks);
+
+  if (fullBuffer.length < 12) {
+    return Errors.validation(reply, [{ field: "file", message: "Arquivo inválido." }]);
+  }
+
+  const mime = detectMime(fullBuffer);
+  if (!mime || !ALLOWED_MIME[mime]) {
+    return Errors.validation(reply, [{ field: "file", message: "Formato não suportado. Use JPEG, PNG ou WebP." }]);
+  }
+
+  const ext = ALLOWED_MIME[mime];
+  const filename = `${randomUUID()}${ext}`;
+
+  try {
+    mkdirSync(PHOTOS_DIR, { recursive: true });
+  } catch {
+    return Errors.internal(reply);
+  }
+
+  const filePath = join(PHOTOS_DIR, filename);
+  const ws = createWriteStream(filePath);
+  ws.write(fullBuffer);
+  ws.end();
+
+  await new Promise<void>((resolve, reject) => {
+    ws.on("finish", resolve);
+    ws.on("error", reject);
+  });
+
+  const photo_url = `/uploads/professionals/${filename}`;
+
+  await prisma.professionalSubscription.update({
+    where: { id: subscription.id },
+    data: { photo_url },
+  });
+
+  return sendSuccess(reply, { photo_url });
+}
+
+// ============================================================
+// GET /professionals/subscribe/status — usuário autenticado
+// Retorna o status da assinatura do usuário logado
+// ============================================================
+
+export async function getSubscriptionStatus(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  const userId = request.user.sub;
+
+  const subscription = await prisma.professionalSubscription.findUnique({
+    where: { user_id: userId },
+    select: {
+      id: true,
+      status: true,
+      checkout_url: true,
+      billing_id: true,
+      amount_cents: true,
+      full_name: true,
+      registration_type: true,
+      professional_id: true,
+      created_at: true,
+      updated_at: true,
+    },
+  });
+
+  // Fallback de polling: se o pagamento foi aprovado no AbacatePay mas o webhook
+  // não chegou (dev sem túnel, webhook perdido), ativa a assinatura agora.
+  if (
+    subscription?.status === "pending_payment" &&
+    subscription.billing_id &&
+    env.ABACATEPAY_API_KEY
+  ) {
+    try {
+      // billing_id neste ponto é o ID do *checkout* retornado pelo POST /subscriptions/create.
+      // O ID da assinatura real só chega via webhook subscription.completed (e é salvo em
+      // billing_id pela activateProfessionalSubscription). Portanto usamos /checkouts/get,
+      // não /subscriptions/get — que exige o subscription ID e nunca encontraria nada aqui.
+      const abacateCheckout = await abacatepay.getCardCheckoutStatus(
+        env.ABACATEPAY_API_KEY,
+        env.ABACATEPAY_BASE_URL,
+        subscription.billing_id,
+      );
+
+      const isConfirmed = ["COMPLETED", "PAID", "APPROVED"].includes(
+        abacateCheckout.status.toUpperCase(),
+      );
+
+      if (isConfirmed) {
+        await activateProfessionalSubscription(
+          subscription.id,
+          subscription.billing_id,
+          request.log,
+        );
+
+        // Retorna o estado atualizado
+        const updated = await prisma.professionalSubscription.findUnique({
+          where: { user_id: userId },
+          select: {
+            id: true,
+            status: true,
+            checkout_url: true,
+            amount_cents: true,
+            full_name: true,
+            registration_type: true,
+            professional_id: true,
+            created_at: true,
+            updated_at: true,
+          },
+        });
+        return sendSuccess(reply, updated ?? null);
+      }
+    } catch (err) {
+      // Polling falhou — retorna o status do banco sem bloquear
+      request.log.warn(err, "Falha ao consultar status da assinatura no AbacatePay");
+    }
+  }
+
+  // Remove billing_id da resposta (dado interno)
+  if (subscription) {
+    const { billing_id: _b, ...rest } = subscription;
+    return sendSuccess(reply, rest);
+  }
+
+  return sendSuccess(reply, null);
 }
 
 // ============================================================

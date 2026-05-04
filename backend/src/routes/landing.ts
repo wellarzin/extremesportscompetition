@@ -143,6 +143,7 @@ export async function landingRoutes(app: FastifyInstance) {
                   status: { type: "string" },
                   cover_image_url: { type: "string", nullable: true },
                   ranking_points: { type: "integer", nullable: true },
+                  reward: { type: "string" },
                 },
               },
             },
@@ -174,6 +175,7 @@ export async function landingRoutes(app: FastifyInstance) {
           status: true,
           cover_image_url: true,
           ranking_points: true,
+          reward: true,
         },
         orderBy: { start_datetime: "asc" },
         take: 3,
@@ -235,6 +237,7 @@ export async function landingRoutes(app: FastifyInstance) {
                   status: { type: "string" },
                   cover_image_url: { type: "string", nullable: true },
                   ranking_points: { type: "integer", nullable: true },
+                  reward: { type: "string" },
                   organizer: {
                     type: "object",
                     properties: {
@@ -311,6 +314,7 @@ export async function landingRoutes(app: FastifyInstance) {
             status: true,
             cover_image_url: true,
             ranking_points: true,
+            reward: true,
             organizer: { select: { id: true, full_name: true } },
           },
           orderBy: { [sort]: order },
@@ -369,6 +373,7 @@ export async function landingRoutes(app: FastifyInstance) {
                 status: { type: "string" },
                 cover_image_url: { type: "string", nullable: true },
                 ranking_points: { type: "integer", nullable: true },
+                reward: { type: "string" },
                 created_at: { type: "string", format: "date-time" },
                 organizer: {
                   type: "object",
@@ -407,6 +412,7 @@ export async function landingRoutes(app: FastifyInstance) {
           status: true,
           cover_image_url: true,
           ranking_points: true,
+          reward: true,
           created_at: true,
           // Nunca expor dados privados do organizador além de id e full_name
           organizer: { select: { id: true, full_name: true } },
@@ -420,7 +426,7 @@ export async function landingRoutes(app: FastifyInstance) {
   });
 
   // ----------------------------------------------------------
-  // POST /landing/contact — Formulário de parceria
+  // POST /landing/contact — Proposta de evento ou patrocínio
   // ----------------------------------------------------------
   app.post("/contact", {
     config: {
@@ -431,33 +437,41 @@ export async function landingRoutes(app: FastifyInstance) {
     },
     schema: {
       tags: ["🏠 Landing Page"],
-      summary: "Envia formulário de contato para parceria",
-      description: "Recebe os dados do formulário de parceria e envia emails de notificação para a equipe comercial e confirmação para o parceiro. Sem autenticação. Rate limited: 3 req/min.",
+      summary: "Recebe proposta de evento ou patrocínio",
+      description: "Salva a proposta no banco e envia emails de notificação para financeiro@ e confirmação para o solicitante. Sem autenticação. Rate limited: 3 req/min.",
       security: [],
       body: {
         type: "object",
         required: ["company_name", "contact_name", "contact_email"],
         properties: {
-          company_name: { type: "string", minLength: 1, maxLength: 200, description: "Nome da empresa" },
-          cnpj: { type: "string", maxLength: 20, description: "CNPJ da empresa" },
-          contact_name: { type: "string", minLength: 1, maxLength: 200, description: "Nome do responsável" },
-          contact_email: { type: "string", format: "email", description: "Email de contato" },
-          event_type: { type: "string", maxLength: 100, description: "Tipo de evento desejado" },
-          event_date: { type: "string", maxLength: 20, description: "Data prevista do evento" },
-          city: { type: "string", maxLength: 100, description: "Cidade do evento" },
-          budget: { type: "string", maxLength: 100, description: "Faixa de orçamento" },
+          contact_type: {
+            type: "string",
+            enum: ["event_creator", "sponsor"],
+            default: "event_creator",
+            description: "Tipo de contato: criador de evento ou patrocinador",
+          },
+          company_name: { type: "string", minLength: 1, maxLength: 200 },
+          cnpj: { type: "string", maxLength: 20 },
+          contact_name: { type: "string", minLength: 1, maxLength: 200 },
+          contact_email: { type: "string", format: "email" },
+          // Campos de proposta de evento
+          event_type: { type: "string", maxLength: 100 },
+          event_date: { type: "string", maxLength: 20 },
+          city: { type: "string", maxLength: 100 },
+          budget: { type: "string", maxLength: 100 },
           services: {
             type: "array",
             items: { type: "string", maxLength: 100 },
             maxItems: 10,
-            description: "Serviços desejados",
           },
-          message: { type: "string", maxLength: 2000, description: "Mensagem adicional" },
+          // Campo de patrocínio
+          sponsorship_package: { type: "string", maxLength: 100 },
+          message: { type: "string", maxLength: 2000 },
         },
       },
       response: {
         200: {
-          description: "Solicitação enviada com sucesso",
+          description: "Proposta recebida com sucesso",
           type: "object",
           properties: {
             success: { type: "boolean", example: true },
@@ -465,6 +479,7 @@ export async function landingRoutes(app: FastifyInstance) {
               type: "object",
               properties: {
                 message: { type: "string" },
+                proposal_id: { type: "string", format: "uuid" },
               },
             },
           },
@@ -475,6 +490,7 @@ export async function landingRoutes(app: FastifyInstance) {
     },
     handler: async (request, reply) => {
       const body = request.body as {
+        contact_type?: "event_creator" | "sponsor";
         company_name: string;
         cnpj?: string;
         contact_name: string;
@@ -484,35 +500,71 @@ export async function landingRoutes(app: FastifyInstance) {
         city?: string;
         budget?: string;
         services?: string[];
+        sponsorship_package?: string;
         message?: string;
       };
 
-      try {
-        await email.sendPartnerContact({
-          companyName: body.company_name,
-          cnpj: body.cnpj ?? "",
-          contactName: body.contact_name,
-          contactEmail: body.contact_email,
-          eventType: body.event_type ?? "",
-          eventDate: body.event_date ?? "",
-          city: body.city ?? "",
-          budget: body.budget ?? "",
-          services: body.services ?? [],
-          message: body.message ?? "",
-        });
+      const proposalType = body.contact_type === "sponsor" ? "sponsor" : "event_creator";
 
-        return sendSuccess(reply, {
-          message: "Solicitação enviada com sucesso! Nossa equipe entrará em contato em até 24 horas.",
+      // 1. Persiste a proposta no banco
+      let proposal: { id: string };
+      try {
+        proposal = await prisma.eventProposal.create({
+          data: {
+            type: proposalType,
+            company_name: body.company_name.trim(),
+            cnpj: body.cnpj?.trim() ?? null,
+            contact_name: body.contact_name.trim(),
+            contact_email: body.contact_email.trim().toLowerCase(),
+            event_type: body.event_type?.trim() ?? null,
+            event_date: body.event_date?.trim() ?? null,
+            city: body.city?.trim() ?? null,
+            budget: body.budget?.trim() ?? null,
+            services: body.services ?? [],
+            sponsorship_package: body.sponsorship_package?.trim() ?? null,
+            message: body.message?.trim() ?? null,
+          },
+          select: { id: true },
         });
       } catch (err) {
-        request.log.error(err, "Erro ao enviar email de contato de parceria");
-        return sendError(
-          reply,
-          500,
-          "EMAIL_SEND_FAILED",
-          "Não foi possível enviar sua solicitação. Tente novamente ou entre em contato diretamente pelo email extremesportscompetition@gmail.com."
-        );
+        request.log.error(err, "Erro ao salvar proposta no banco");
+        return sendError(reply, 500, "DB_ERROR", "Não foi possível registrar sua proposta. Tente novamente.");
       }
+
+      // 2. Envia os emails (falha de email não reverte a proposta salva)
+      try {
+        if (proposalType === "sponsor") {
+          await email.sendSponsorProposalNotification({
+            companyName: body.company_name.trim(),
+            cnpj: body.cnpj?.trim() ?? "",
+            contactName: body.contact_name.trim(),
+            contactEmail: body.contact_email.trim(),
+            sponsorshipPackage: body.sponsorship_package?.trim() ?? "",
+            message: body.message?.trim() ?? "",
+          });
+        } else {
+          await email.sendEventProposalNotification({
+            companyName: body.company_name.trim(),
+            cnpj: body.cnpj?.trim() ?? "",
+            contactName: body.contact_name.trim(),
+            contactEmail: body.contact_email.trim(),
+            eventType: body.event_type?.trim() ?? "",
+            eventDate: body.event_date?.trim() ?? "",
+            city: body.city?.trim() ?? "",
+            budget: body.budget?.trim() ?? "",
+            services: body.services ?? [],
+            message: body.message?.trim() ?? "",
+          });
+        }
+      } catch (err) {
+        // Proposta já foi salva — apenas loga o erro de email, não falha o request
+        request.log.error(err, "Erro ao enviar emails de notificação de proposta");
+      }
+
+      return sendSuccess(reply, {
+        message: "Proposta recebida! Nossa equipe entrará em contato em até 24 horas.",
+        proposal_id: proposal.id,
+      });
     },
   });
 }

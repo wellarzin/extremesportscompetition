@@ -47,6 +47,7 @@ export interface LandingEvent {
   status: EventStatus;
   cover_image_url: string | null;
   ranking_points: number | null;
+  reward: string;
   organizer: { id: string; full_name: string };
 }
 
@@ -73,6 +74,7 @@ export interface FeaturedEvent {
   status: EventStatus;
   cover_image_url: string | null;
   ranking_points: number | null;
+  reward: string;
 }
 
 // ---- Landing: Profissionais ----
@@ -141,6 +143,40 @@ export interface PaymentSession {
 export interface PaymentStatusResponse {
   status: 'pending' | 'paid' | 'failed' | 'expired';
   ticket_id: string | null;
+}
+
+// ---- Assinatura Profissional ----
+
+export type ProfessionalSubscriptionStatus = 'pending_payment' | 'active' | 'cancelled' | 'past_due';
+
+export interface ProfessionalSubscriptionSession {
+  subscription_id: string;
+  checkout_url: string;
+  amount_cents: number;
+  status: ProfessionalSubscriptionStatus;
+  resumed?: boolean;
+}
+
+export interface ProfessionalSubscriptionStatusResponse {
+  id: string;
+  status: ProfessionalSubscriptionStatus;
+  checkout_url: string | null;
+  amount_cents: number;
+  full_name: string;
+  registration_type: string;
+  professional_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProfessionalSubscribeInput {
+  full_name: string;
+  birth_date: string;
+  education: string;
+  registration_number: string;
+  registration_type: string;
+  bio?: string;
+  specialties: Array<{ specialty: string; notes?: string }>;
 }
 
 export interface RegisterInput {

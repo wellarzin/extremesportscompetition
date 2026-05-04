@@ -7,14 +7,16 @@ import { Hero } from './sections/Hero';
 import { Stats } from './sections/Stats';
 import { Events } from './sections/Events';
 import { Athletes } from './sections/Athletes';
-// import { Rankings } from './sections/Rankings';
+import { Rankings } from './sections/Rankings';
 import { BrandsTicker } from './sections/BrandsTicker';
 import { Companies } from './sections/Companies';
+import { CreateEvents } from './sections/CreateEvents';
 import { Testimonials } from './sections/Testimonials';
 import { FAQ } from './sections/FAQ';
 import { Footer } from './sections/Footer';
 import { AllEventsPage } from './pages/AllEventsPage';
 import { AllProfessionalsPage } from './pages/AllProfessionalsPage';
+import { PaymentReturnHandler } from './components/PaymentReturnHandler';
 
 function LandingPage() {
   useLenis();
@@ -24,9 +26,10 @@ function LandingPage() {
       <Stats />
       <Events />
       <Athletes />
-      {/* <Rankings /> */}
+      <Rankings />
       <BrandsTicker />
       <Companies />
+      <CreateEvents />
       <Testimonials />
       <FAQ />
       <Footer />
@@ -47,6 +50,7 @@ function App() {
       <NavigationProvider>
         <AuthModalProvider>
           <AppContent />
+          <PaymentReturnHandler />
         </AuthModalProvider>
       </NavigationProvider>
     </AuthProvider>

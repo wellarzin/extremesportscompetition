@@ -194,6 +194,25 @@ enum RankingBadge {
   bronze
 }
 
+enum ProposalType {
+  event_creator
+  sponsor
+}
+
+enum ProposalStatus {
+  pending
+  contacted
+  approved
+  rejected
+}
+
+enum ProfessionalSubscriptionStatus {
+  pending_payment
+  active
+  cancelled
+  past_due
+}
+
 enum ProfessionalSpecialty {
   hipertrofia
   emagrecimento
@@ -258,6 +277,9 @@ model User {
   consent_version      String?        @db.VarChar(10)
   consent_given_at     DateTime?
 
+  // Comprovante de 200+ viagens/entregas (imagem enviada pelo usuário)
+  delivery_proof_url    String?
+
   // LGPD — requisição de exclusão com carência de 7 dias
   deletion_requested_at DateTime?
 
@@ -265,19 +287,20 @@ model User {
   updated_at           DateTime       @updatedAt
   deleted_at           DateTime?
 
-  sport_preferences         UserSportPreference[]
-  education_preferences     UserEducationPreference[]
-  culture_preferences       UserCulturePreference[]
-  organized_events          Event[]                    @relation("EventOrganizer")
-  tickets                   Ticket[]
-  waitlist                  Waitlist[]
-  rankings                  Ranking[]
-  professional              Professional?
-  refresh_tokens            RefreshToken[]
-  email_verification_tokens EmailVerificationToken[]
-  password_reset_tokens     PasswordResetToken[]
-  email_change_tokens       EmailChangeToken[]
-  payments                  Payment[]
+  sport_preferences           UserSportPreference[]
+  education_preferences       UserEducationPreference[]
+  culture_preferences         UserCulturePreference[]
+  organized_events            Event[]                    @relation("EventOrganizer")
+  tickets                     Ticket[]
+  waitlist                    Waitlist[]
+  rankings                    Ranking[]
+  professional                Professional?
+  professional_subscription   ProfessionalSubscription?
+  refresh_tokens              RefreshToken[]
+  email_verification_tokens   EmailVerificationToken[]
+  password_reset_tokens       PasswordResetToken[]
+  email_change_tokens         EmailChangeToken[]
+  payments                    Payment[]
 
   @@index([email])
   @@index([document_number_hash])
@@ -412,6 +435,7 @@ model Event {
   status          EventStatus   @default(aberto)
   featured        Boolean       @default(false)
   ranking_points  Int?
+  reward          String        @default("A definir")
   created_at      DateTime      @default(now())
   updated_at      DateTime      @updatedAt
   deleted_at      DateTime?
@@ -506,8 +530,9 @@ model Professional {
   updated_at          DateTime  @updatedAt
   deleted_at          DateTime?
 
-  user        User?                     @relation(fields: [user_id], references: [id], onDelete: SetNull)
-  specialties ProfessionalSpecialties[]
+  user         User?                     @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  specialties  ProfessionalSpecialties[]
+  subscription ProfessionalSubscription?
 
   @@index([active])
   @@index([deleted_at])
@@ -543,6 +568,82 @@ model Ranking {
   @@index([sport, points(sort: Desc)])
   @@index([user_id])
   @@map("rankings")
+}
+
+// Propostas recebidas via landing page (criação de eventos e patrocínio)
+model EventProposal {
+  id                  String         @id @default(uuid()) @db.Uuid
+  type                ProposalType   @default(event_creator)
+  status              ProposalStatus @default(pending)
+
+  // Dados do contato
+  company_name        String         @db.VarChar(200)
+  cnpj                String?        @db.VarChar(20)
+  contact_name        String         @db.VarChar(200)
+  contact_email       String         @db.VarChar(255)
+
+  // Campos de proposta de evento (type = event_creator)
+  event_type          String?        @db.VarChar(100)
+  event_date          String?        @db.VarChar(20)
+  city                String?        @db.VarChar(100)
+  budget              String?        @db.VarChar(100)
+  services            String[]
+
+  // Campos de patrocínio (type = sponsor)
+  sponsorship_package String?        @db.VarChar(100)
+
+  // Campo comum
+  message             String?        @db.Text
+
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([created_at])
+  @@map("event_proposals")
+}
+
+// Assinatura do profissional — controla o ciclo de vida do cadastro via pagamento recorrente
+model ProfessionalSubscription {
+  id                  String                         @id @default(uuid()) @db.Uuid
+  user_id             String                         @unique @db.Uuid
+  full_name           String                         @db.VarChar(255)
+  birth_date          DateTime                       @db.Date
+  education           String                         @db.VarChar(255)
+  registration_number String                         @unique @db.VarChar(50)
+  registration_type   String                         @db.VarChar(20)
+  bio                 String?                        @db.Text
+  photo_url           String?
+  // AbacatePay subscription reference
+  billing_id          String?
+  checkout_url        String?
+  amount_cents        Int
+  status              ProfessionalSubscriptionStatus @default(pending_payment)
+  // Vinculado após ativação via webhook
+  professional_id     String?                        @unique @db.Uuid
+  created_at          DateTime                       @default(now())
+  updated_at          DateTime                       @updatedAt
+
+  user         User                                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  professional Professional?                       @relation(fields: [professional_id], references: [id], onDelete: SetNull)
+  specialties  ProfessionalSubscriptionSpecialty[]
+
+  @@index([status])
+  @@index([billing_id])
+  @@map("professional_subscriptions")
+}
+
+model ProfessionalSubscriptionSpecialty {
+  id              String                @id @default(uuid()) @db.Uuid
+  subscription_id String                @db.Uuid
+  specialty       ProfessionalSpecialty
+  notes           String?               @db.VarChar(255)
+
+  subscription ProfessionalSubscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+
+  @@index([subscription_id])
+  @@map("professional_subscription_specialties")
 }
 
 model RankingHistory {

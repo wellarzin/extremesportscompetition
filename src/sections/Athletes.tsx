@@ -5,10 +5,14 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { athletesConfig } from '../config';
 import { useLandingProfessionals } from '../hooks/useLandingProfessionals';
 import type { LandingProfessional } from '../types/api';
-import { Trophy, ArrowUpRight, ChevronLeft, ChevronRight, ArrowRight, RefreshCw } from 'lucide-react';
+import { Trophy, ArrowUpRight, ChevronLeft, ChevronRight, ArrowRight, RefreshCw, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
 import { mediaUrl } from '../lib/utils';
 import { useNavigation } from '../contexts/NavigationContext';
 import { ProfessionalProfileModal, PLACEHOLDER_AVATAR } from '../components/ProfessionalProfileModal';
+import { CreateProfessionalModal } from './CreateProfessional';
+import { useAuthContext } from '../contexts/AuthContext';
+import { useAuthModal } from '../contexts/AuthModalContext';
+import { getMyProfessionalSubscriptionStatus } from '../lib/api';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -39,9 +43,18 @@ export function Athletes() {
   const [selected, setSelected] = useState<{ pro: LandingProfessional; index: number } | null>(null);
   const [prevEnabled, setPrevEnabled] = useState(false);
   const [nextEnabled, setNextEnabled] = useState(false);
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [subscribeSuccess] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('pro_subscribed') === '1';
+  });
+  const [subscribeActivated, setSubscribeActivated] = useState(false);
+  const [checkingActivation, setCheckingActivation] = useState(false);
 
   const { professionals, isLoading, error, refetch } = useLandingProfessionals(10);
   const { navigate } = useNavigation();
+  const { user } = useAuthContext();
+  const { openAuthModal } = useAuthModal();
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
@@ -69,6 +82,59 @@ export function Athletes() {
   useEffect(() => {
     if (!isLoading && emblaApi) emblaApi.reInit();
   }, [isLoading, emblaApi]);
+
+  // Remove o parâmetro pro_subscribed da URL sem recarregar a página
+  useEffect(() => {
+    if (subscribeSuccess) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('pro_subscribed');
+      window.history.replaceState({}, '', url.toString());
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Polling automático quando o usuário volta do checkout — verifica se a assinatura foi ativada
+  useEffect(() => {
+    if (!subscribeSuccess || !user) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 6; // 30 segundos no total
+
+    const check = async () => {
+      try {
+        const sub = await getMyProfessionalSubscriptionStatus();
+        if (cancelled) return;
+        if (sub?.status === 'active') {
+          setSubscribeActivated(true);
+          refetch(); // atualiza o carrossel com o novo profissional
+          return;
+        }
+      } catch {
+        // silencioso
+      }
+      attempts += 1;
+      if (attempts < MAX_ATTEMPTS && !cancelled) {
+        setTimeout(check, 5000);
+      }
+    };
+
+    // Primeira checagem após 3s (dá tempo do backend processar)
+    const timer = setTimeout(check, 3000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleSubscribeCTA() {
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    setShowSubscribeModal(true);
+  }
 
   // GSAP: animate title on scroll
   useEffect(() => {
@@ -115,7 +181,7 @@ export function Athletes() {
             </span>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-sans font-extrabold text-white tracking-tight leading-none mb-4">
               {athletesConfig.titleRegular}{' '}
-              <span className="font-serif italic text-[#4169E1]">{athletesConfig.titleItalic}</span>
+              <span className="font-serif italic text-[#FF6B00]">{athletesConfig.titleItalic}</span>
             </h2>
             <p className="text-base text-white/50 max-w-md leading-relaxed">
               {athletesConfig.description}
@@ -249,7 +315,7 @@ export function Athletes() {
                                 ? pro.specialties[0].specialty
                                 : 'Especialista'}
                             </span>
-                            <span className="flex items-center gap-1 text-xs font-semibold text-[#4169E1] opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300">
+                            <span className="flex items-center gap-1 text-xs font-semibold text-[#FF6B00] opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-300">
                               Ver perfil <ArrowUpRight className="w-3 h-3" />
                             </span>
                           </div>
@@ -267,6 +333,83 @@ export function Athletes() {
             Nenhum profissional cadastrado no momento.
           </div>
         )}
+
+        {/* CTA: Quero me tornar um profissional */}
+        <div className="mt-16 pt-12 border-t border-white/5">
+          {subscribeSuccess ? (
+            /* Banner de sucesso pós-pagamento */
+            <div className="flex flex-col items-center text-center gap-4 py-8">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${subscribeActivated ? 'bg-[#00FF87]/20 border border-[#00FF87]/40' : 'bg-[#00FF87]/10 border border-[#00FF87]/20'}`}>
+                {checkingActivation
+                  ? <Loader2 className="w-7 h-7 text-[#00FF87] animate-spin" />
+                  : <CheckCircle2 className={`w-7 h-7 ${subscribeActivated ? 'text-[#00FF87]' : 'text-[#00FF87]/70'}`} />
+                }
+              </div>
+              <div>
+                {subscribeActivated ? (
+                  <>
+                    <h3 className="text-xl font-bold text-white mb-2">Perfil ativado!</h3>
+                    <p className="text-white/50 text-sm max-w-md leading-relaxed">
+                      Seu perfil profissional já está visível na plataforma. Bem-vindo!
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-xl font-bold text-white mb-2">Pagamento em processamento!</h3>
+                    <p className="text-white/50 text-sm max-w-md leading-relaxed">
+                      Seu perfil será ativado automaticamente assim que o pagamento for confirmado.
+                    </p>
+                    <button
+                      onClick={async () => {
+                        setCheckingActivation(true);
+                        try {
+                          const sub = await getMyProfessionalSubscriptionStatus();
+                          if (sub?.status === 'active') {
+                            setSubscribeActivated(true);
+                            refetch();
+                          }
+                        } finally {
+                          setCheckingActivation(false);
+                        }
+                      }}
+                      disabled={checkingActivation}
+                      className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-lg border border-white/10 text-white/50 hover:text-white hover:border-white/20 text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed mx-auto"
+                    >
+                      {checkingActivation ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                      Verificar ativação
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* CTA padrão */
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-12">
+              <div>
+                <h3 className="text-xl md:text-2xl font-sans font-bold text-white mb-2">
+                  É profissional de saúde ou educação física?
+                </h3>
+                <p className="text-white/40 text-sm leading-relaxed max-w-md">
+                  Cadastre-se na plataforma e tenha visibilidade para milhares de atletas e
+                  trabalhadores que buscam suporte profissional especializado.
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <button
+                  onClick={handleSubscribeCTA}
+                  className="group relative flex items-center gap-3 px-7 py-4 rounded-xl bg-gradient-to-r from-[#4169E1] to-[#4169E1]/80 hover:from-[#4169E1] hover:to-[#00FF87]/80 text-white font-bold text-sm transition-all duration-500 shadow-lg shadow-[#4169E1]/20 hover:shadow-[#00FF87]/20"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Quero me tornar um profissional
+                  <ArrowUpRight className="w-4 h-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                </button>
+                <p className="text-center text-xs text-white/20 mt-2">
+                  A partir de R$ 49,90/mês · Cancele quando quiser
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {selected && (
@@ -275,6 +418,10 @@ export function Athletes() {
           index={selected.index}
           onClose={() => setSelected(null)}
         />
+      )}
+
+      {showSubscribeModal && (
+        <CreateProfessionalModal onClose={() => setShowSubscribeModal(false)} />
       )}
     </section>
   );

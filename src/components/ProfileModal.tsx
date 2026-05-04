@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
-import { X, Ticket, Calendar, MapPin, Tag, Loader2, Inbox } from 'lucide-react';
-import { fetchMyTickets } from '../lib/api';
+import { useState, useEffect, useRef } from 'react';
+import {
+  X, Ticket, Calendar, MapPin, Tag, Loader2, Inbox,
+  Upload, CheckCircle, AlertCircle, FileImage, ExternalLink,
+} from 'lucide-react';
+import { fetchMyTickets, fetchMe, uploadDeliveryProof } from '../lib/api';
 import { mediaUrl } from '../lib/utils';
 import { useAuthContext } from '../contexts/AuthContext';
 import type { UserTicket, ApiMeta } from '../types/api';
@@ -45,6 +48,129 @@ const STATUS_CONFIG = {
   usado: { label: 'Utilizado', classes: 'bg-white/8 text-white/40 border-white/10' },
 };
 
+// ---- DeliveryProofSection ----
+
+function DeliveryProofSection({ initialUrl }: { initialUrl: string | null }) {
+  const [proofUrl, setProofUrl] = useState<string | null>(initialUrl);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [justUploaded, setJustUploaded] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+    setJustUploaded(false);
+
+    try {
+      const res = await uploadDeliveryProof(file);
+      setProofUrl(res.delivery_proof_url);
+      setJustUploaded(true);
+      setTimeout(() => setJustUploaded(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao enviar comprovante.');
+    } finally {
+      setUploading(false);
+      // Reset input para permitir re-upload do mesmo arquivo
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  const proofSrc = proofUrl ? mediaUrl(proofUrl) : null;
+
+  return (
+    <div className="px-7 py-5 border-b border-white/5">
+      {/* Header da seção */}
+      <div className="flex items-center gap-2.5 mb-4">
+        <FileImage className="w-4 h-4 text-[#00FF87]" />
+        <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
+          Comprovante de Viagens / Entregas
+        </h2>
+        <span className="ml-auto text-[10px] font-medium text-white/30 uppercase tracking-wider">
+          mín. 200
+        </span>
+      </div>
+
+      <div className="flex items-start gap-4">
+        {/* Preview da imagem atual */}
+        <div
+          className="w-20 h-20 rounded-xl border border-white/10 bg-white/5 flex-shrink-0 overflow-hidden flex items-center justify-center"
+        >
+          {proofSrc ? (
+            <img
+              src={proofSrc}
+              alt="Comprovante"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <FileImage className="w-7 h-7 text-white/15" />
+          )}
+        </div>
+
+        {/* Info + ações */}
+        <div className="flex-1 min-w-0 space-y-2">
+          {proofSrc ? (
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-3.5 h-3.5 text-[#00FF87] flex-shrink-0" />
+              <span className="text-xs text-[#00FF87] font-medium">Comprovante enviado</span>
+              <a
+                href={proofSrc}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Ver
+              </a>
+            </div>
+          ) : (
+            <p className="text-xs text-white/40 leading-relaxed">
+              Envie uma imagem comprovando pelo menos 200 viagens ou entregas realizadas.
+            </p>
+          )}
+
+          {error && (
+            <div className="flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+              <span className="text-xs text-red-400">{error}</span>
+            </div>
+          )}
+
+          {justUploaded && (
+            <p className="text-xs text-[#00FF87]">Comprovante atualizado com sucesso!</p>
+          )}
+
+          {/* Botão de upload */}
+          <button
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-xs text-white/60 hover:text-white font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {uploading
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <Upload className="w-3.5 h-3.5" />
+            }
+            {uploading ? 'Enviando...' : proofUrl ? 'Substituir imagem' : 'Enviar comprovante'}
+          </button>
+
+          <p className="text-[10px] text-white/20">JPEG, PNG ou WebP · máx. 10 MB</p>
+        </div>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+    </div>
+  );
+}
+
 // ---- component ----
 
 interface ProfileModalProps {
@@ -54,6 +180,7 @@ interface ProfileModalProps {
 
 export function ProfileModal({ open, onClose }: ProfileModalProps) {
   const { user } = useAuthContext();
+  const [deliveryProofUrl, setDeliveryProofUrl] = useState<string | null>(null);
   const [tickets, setTickets] = useState<UserTicket[]>([]);
   const [meta, setMeta] = useState<ApiMeta | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,8 +191,13 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
       setTickets([]);
       setMeta(null);
       setPage(1);
+      setDeliveryProofUrl(null);
       return;
     }
+    // Carrega perfil completo e ingressos em paralelo
+    fetchMe()
+      .then((me) => setDeliveryProofUrl(me.delivery_proof_url))
+      .catch(() => {});
     loadTickets(1);
   }, [open]);
 
@@ -105,7 +237,6 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
 
         {/* Header */}
         <div className="flex items-center gap-4 px-7 py-5 border-b border-white/5 flex-shrink-0">
-          {/* Avatar */}
           <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-[#4169E1]/20 flex items-center justify-center ring-2 ring-white/10">
             {avatarSrc ? (
               <img src={avatarSrc} alt={user.full_name} className="w-full h-full object-cover" />
@@ -128,7 +259,10 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
           </button>
         </div>
 
-        {/* Section title */}
+        {/* Seção de comprovante — acima dos ingressos */}
+        <DeliveryProofSection initialUrl={deliveryProofUrl} />
+
+        {/* Section title — ingressos */}
         <div className="flex items-center gap-2.5 px-7 py-4 border-b border-white/5 flex-shrink-0">
           <Ticket className="w-4 h-4 text-[#FF6B00]" />
           <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
@@ -144,14 +278,12 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
         {/* Content */}
         <div className="overflow-y-auto flex-1 p-7">
           {isLoading && tickets.length === 0 ? (
-            /* Loading skeleton */
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="h-28 rounded-xl bg-white/5 animate-pulse" />
               ))}
             </div>
           ) : tickets.length === 0 ? (
-            /* Empty state */
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
                 <Inbox className="w-8 h-8 text-white/20" />
@@ -162,7 +294,6 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
               </p>
             </div>
           ) : (
-            /* Tickets list */
             <div className="space-y-4">
               {tickets.map(ticket => {
                 const cover = ticket.event.cover_image_url
@@ -179,7 +310,6 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                     key={ticket.id}
                     className="flex gap-4 p-4 rounded-xl bg-white/4 border border-white/8 hover:border-white/15 transition-colors"
                   >
-                    {/* Cover */}
                     <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-white/5">
                       {cover ? (
                         <img
@@ -194,7 +324,6 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                       )}
                     </div>
 
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <p className="text-white font-semibold text-sm leading-snug line-clamp-2">
@@ -237,7 +366,6 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
                 );
               })}
 
-              {/* Load more */}
               {hasMore && (
                 <button
                   onClick={() => loadTickets(page + 1)}

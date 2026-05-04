@@ -11,7 +11,10 @@
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:abacatepay.readme.io)",
       "Bash(curl -s https://raw.githubusercontent.com/AbacatePay/documentation/main/openapi.yaml)",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "WebFetch(domain:www.abacatepay.com)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

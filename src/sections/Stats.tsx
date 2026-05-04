@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { statsConfig } from '../config';
-import { TrendingUp, Users, Calendar, Globe, Award, ThumbsUp } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -80,12 +79,6 @@ export function Stats() {
     return () => ctx.revert();
   }, []);
 
-  const getIcon = (index: number) => {
-    const icons = [Calendar, Users, Globe, Award, TrendingUp, ThumbsUp];
-    const Icon = icons[index % icons.length];
-    return <Icon className="w-8 h-8" />;
-  };
-
   const formatValue = (value: number) => {
     if (value >= 1000000) {
       return (value / 1000000).toFixed(0) + 'M';
@@ -132,17 +125,12 @@ export function Stats() {
                 <div className="absolute inset-0 bg-gradient-to-br from-[#4169E1]/5 via-transparent to-[#FF6B00]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                 <div className="relative z-10">
-                  {/* Icon */}
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#4169E1]/10 to-[#FF6B00]/10 flex items-center justify-center mb-5 text-[#4169E1] group-hover:text-[#FF6B00] transition-colors duration-300">
-                    {getIcon(index)}
-                  </div>
-
                   {/* Value */}
-                  <div className="flex items-baseline gap-0.5 mb-1.5">
-                    <span className="text-4xl md:text-5xl font-extrabold text-[#0A0A0A] tracking-tight">
+                  <div className="flex items-baseline gap-0.5 mb-2">
+                    <span className="text-5xl md:text-6xl font-extrabold text-[#0A0A0A] tracking-tight">
                       {formatValue(animatedValues[index])}
                     </span>
-                    <span className="text-2xl md:text-3xl font-bold text-[#FF6B00]">
+                    <span className="text-3xl md:text-4xl font-bold text-[#FF6B00]">
                       {stat.suffix}
                     </span>
                   </div>
@@ -155,20 +143,6 @@ export function Stats() {
           ))}
         </div>
 
-        {/* Bottom CTA */}
-        <div className="mt-16 text-center">
-          <p className="text-[#0A0A0A]/50 mb-6">
-            Faça parte dessa história de sucesso
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <a href="#eventos" className="btn-primary">
-              Participar de Eventos
-            </a>
-            <a href="#empresas" className="px-6 py-3 border border-[#0A0A0A]/15 text-[#0A0A0A] font-semibold rounded-lg hover:bg-[#0A0A0A]/5 transition-colors">
-              Seja um Parceiro
-            </a>
-          </div>
-        </div>
       </div>
     </section>
   );

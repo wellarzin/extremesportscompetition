@@ -37,6 +37,21 @@ const envSchema = z.object({
   // Swagger (Basic Auth em produção)
   SWAGGER_USER: z.string().optional(),
   SWAGGER_PASS: z.string().optional(),
+
+  // E-mail (Resend)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default("noreply@extremesportscompetition.com"),
+  EMAIL_FINANCIAL: z.string().default("financeiro@extremesportscompetition.com"),
+}).superRefine((data, ctx) => {
+  // ABACATEPAY_WEBHOOK_SECRET é obrigatório em produção —
+  // sem ele qualquer requisição passa pela validação de assinatura
+  if (data.NODE_ENV === "production" && !data.ABACATEPAY_WEBHOOK_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["ABACATEPAY_WEBHOOK_SECRET"],
+      message: "ABACATEPAY_WEBHOOK_SECRET é obrigatório em produção",
+    });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

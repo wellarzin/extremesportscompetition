@@ -20,6 +20,9 @@ import type {
   UserTicket,
   PaymentSession,
   PaymentStatusResponse,
+  ProfessionalSubscribeInput,
+  ProfessionalSubscriptionSession,
+  ProfessionalSubscriptionStatusResponse,
 } from '../types/api';
 
 export type { RegisterInput };
@@ -118,6 +121,7 @@ export interface MeData {
   email: string;
   role: string;
   photo_url: string | null;
+  delivery_proof_url: string | null;
 }
 
 // Tenta renovar o access token via refresh token cookie httpOnly
@@ -202,6 +206,7 @@ export async function fetchMe(): Promise<MeData> {
     email: res.data.email,
     role: res.data.role,
     photo_url: res.data.photo_url ?? null,
+    delivery_proof_url: res.data.delivery_proof_url ?? null,
   };
 }
 
@@ -308,6 +313,17 @@ export async function initiateCheckout(eventId: string, method: PaymentMethod): 
   return res.data;
 }
 
+// Apenas em devMode (Vite) — dispara o handler real do webhook checkout.completed,
+// incluindo HMAC e rawBody, para testar o caminho exato de produção.
+export async function devSimulateCardCheckout(billingId: string): Promise<void> {
+  await fetch(`${BASE_URL}/api/dev/simulate-payment/card-webhook/${encodeURIComponent(billingId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+    credentials: 'include',
+  });
+}
+
 export async function getPaymentStatus(paymentId: string): Promise<PaymentStatusResponse> {
   const res = await request<ApiResponse<PaymentStatusResponse>>(
     `/api/v1/checkout/payments/${encodeURIComponent(paymentId)}/status`,
@@ -365,7 +381,107 @@ export async function sendPartnerContact(
     '/api/v1/landing/contact',
     {
       method: 'POST',
+      body: JSON.stringify({ ...data, contact_type: 'event_creator' }),
+    },
+    false,
+  );
+  return res.data;
+}
+
+export interface SponsorContactData {
+  company_name: string;
+  cnpj: string;
+  contact_name: string;
+  contact_email: string;
+  sponsorship_package: string;
+  message: string;
+}
+
+// ============================================================
+// Assinatura Profissional
+// ============================================================
+
+export async function subscribeProfessional(
+  data: ProfessionalSubscribeInput,
+): Promise<ProfessionalSubscriptionSession> {
+  const res = await request<ApiResponse<ProfessionalSubscriptionSession>>(
+    '/api/v1/professionals/subscribe',
+    {
+      method: 'POST',
       body: JSON.stringify(data),
+    },
+  );
+  return res.data;
+}
+
+export async function getMyProfessionalSubscriptionStatus(): Promise<ProfessionalSubscriptionStatusResponse | null> {
+  const res = await request<ApiResponse<ProfessionalSubscriptionStatusResponse | null>>(
+    '/api/v1/professionals/subscribe/status',
+    { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function uploadDeliveryProof(file: File): Promise<{ delivery_proof_url: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const headers: Record<string, string> = {};
+  if (_accessToken) headers['Authorization'] = `Bearer ${_accessToken}`;
+
+  const res = await fetch(`${BASE_URL}/api/v1/users/me/delivery-proof`, {
+    method: 'POST',
+    headers,
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const message: string = (body as { message?: string } | null)?.message ?? 'Erro ao enviar comprovante.';
+    throw new ApiError(res.status, message);
+  }
+
+  const data = await res.json() as ApiResponse<{ delivery_proof_url: string }>;
+  return data.data;
+}
+
+export async function uploadSubscriptionPhoto(file: File): Promise<{ photo_url: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const headers: Record<string, string> = {};
+  if (_accessToken) headers['Authorization'] = `Bearer ${_accessToken}`;
+
+  const res = await fetch(`${BASE_URL}/api/v1/professionals/subscribe/photo`, {
+    method: 'POST',
+    headers,
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const message: string = (body as { message?: string } | null)?.message ?? 'Erro ao enviar foto.';
+    throw new ApiError(res.status, message);
+  }
+
+  const data = await res.json() as ApiResponse<{ photo_url: string }>;
+  return data.data;
+}
+
+// ============================================================
+// Contato de Patrocínio
+// ============================================================
+
+export async function sendSponsorContact(
+  data: SponsorContactData,
+): Promise<{ message: string }> {
+  const res = await request<ApiResponse<{ message: string }>>(
+    '/api/v1/landing/contact',
+    {
+      method: 'POST',
+      body: JSON.stringify({ ...data, contact_type: 'sponsor' }),
     },
     false,
   );

@@ -63,7 +63,7 @@ export const heroConfig: HeroConfig = {
     { label: "Eventos", href: "#eventos" },
     { label: "Profissionais", href: "#atletas" },
     // { label: "Rankings", href: "#rankings" },
-    { label: "Loja", href: "#loja" },
+    // { label: "Loja", href: "#loja" },
     { label: "Empresas", href: "#empresas" }
   ],
   onlineUsers: 3428
@@ -82,6 +82,7 @@ export interface Event {
   rules: string;
   prizes: string;
   price: number;
+  rewards?: string;
 }
 
 export interface EventsConfig {
@@ -441,8 +442,88 @@ export const storeConfig: StoreConfig = {
   ]
 };
 
-// Companies Section Configuration
+// Companies Section Configuration (Patrocinadores)
+export interface SponsorPackage {
+  name: string;
+  color: string;
+  perks: string[];
+}
+
+export interface Sponsor {
+  name: string;
+  tagline: string;
+  logoText: string;
+}
+
 export interface CompaniesConfig {
+  subtitle: string;
+  titleRegular: string;
+  titleItalic: string;
+  description: string;
+  benefits: string[];
+  packages: SponsorPackage[];
+  ctaText: string;
+  ctaHref: string;
+  sponsors: {
+    master: Sponsor;
+    gold: Sponsor[];
+  };
+}
+
+export const companiesConfig: CompaniesConfig = {
+  subtitle: "PATROCÍNIO",
+  titleRegular: "Seja",
+  titleItalic: "Parceiro",
+  description: "Associe sua marca à maior plataforma de competições para trabalhadores por aplicativo. Visibilidade real, impacto social e engajamento autêntico.",
+  benefits: [
+    "Logo em todos os eventos e materiais",
+    "Exposição para +15.000 trabalhadores ativos",
+    "Ações de branding exclusivas nos eventos",
+    "Relatórios de engajamento mensais",
+    "Ativações no espaço físico dos eventos",
+    "Impacto social mensurável e documentado"
+  ],
+  packages: [
+    {
+      name: "Bronze",
+      color: "#CD7F32",
+      perks: ["Logo no site", "2 ativações por ano", "Relatório trimestral"]
+    },
+    {
+      name: "Prata",
+      color: "#C0C0C0",
+      perks: ["Logo em destaque", "5 ativações por ano", "Relatório mensal", "Posts em redes sociais"]
+    },
+    {
+      name: "Ouro",
+      color: "#FFD700",
+      perks: ["Logo principal nos eventos", "Ativações ilimitadas", "Relatório semanal", "Campanha dedicada", "Naming de categorias"]
+    },
+    {
+      name: "Master",
+      color: "#FF6B00",
+      perks: ["Naming rights do evento", "Ativações ilimitadas", "Relatório diário", "Campanha dedicada exclusiva", "Naming de todas as categorias", "Presença VIP em todos os eventos"]
+    }
+  ],
+  ctaText: "Quero ser Patrocinador",
+  ctaHref: "#contato",
+  sponsors: {
+    master: {
+      name: 'ApexForce',
+      tagline: 'Energia que move campeões',
+      logoText: 'APEX FORCE',
+    },
+    gold: [
+      { name: 'VitaRun', tagline: 'Nutrição de alta performance', logoText: 'VITA RUN' },
+      { name: 'SportZone', tagline: 'Equipamento para vencer', logoText: 'SPORT ZONE' },
+      { name: 'TrailPro', tagline: 'Onde o esporte encontra a aventura', logoText: 'TRAIL PRO' },
+      { name: 'NutriMax', tagline: 'Suplementação de elite', logoText: 'NUTRI MAX' },
+    ],
+  },
+};
+
+// Create Events Section Configuration
+export interface CreateEventsConfig {
   subtitle: string;
   titleRegular: string;
   titleItalic: string;
@@ -452,20 +533,20 @@ export interface CompaniesConfig {
   ctaHref: string;
 }
 
-export const companiesConfig: CompaniesConfig = {
-  subtitle: "PARA EMPRESAS",
-  titleRegular: "Seja",
-  titleItalic: "Parceiro",
-  description: "Junte-se à Extreme Sports Competition como empresa parceira. Ofereça benefícios aos trabalhadores por aplicativo e fortaleça sua marca.",
+export const createEventsConfig: CreateEventsConfig = {
+  subtitle: "ORGANIZE",
+  titleRegular: "Crie Eventos",
+  titleItalic: "Conosco",
+  description: "Traga sua competição para a maior plataforma de esportes para trabalhadores por aplicativo. Infraestrutura completa, tecnologia e audiência garantida.",
   benefits: [
-    "Visibilidade para milhares de trabalhadores",
-    "Ações de marketing direcionadas",
-    "Eventos exclusivos para sua marca",
-    "Programa de fidelidade integrado",
-    "Relatórios de engajamento",
-    "Impacto social positivo"
+    "Infraestrutura completa de evento",
+    "Sistema de inscrição e apuração digital",
+    "Marketing e divulgação incluídos",
+    "Transmissão ao vivo disponível",
+    "Equipe técnica especializada no dia",
+    "Suporte e acompanhamento do início ao fim"
   ],
-  ctaText: "Seja um Parceiro",
+  ctaText: "Propor um Evento",
   ctaHref: "#contato"
 };
 
@@ -649,7 +730,7 @@ export interface FooterConfig {
 export const footerConfig: FooterConfig = {
   logoText: "EXTREME SPORTS",
   contactLabel: "Contato",
-  email: "extreme@extremesportscompetition.com",
+  email: "projetos@extremesportscompetition.com",
   locationText: "Porto Alegre, RS - Brasil",
   navigationLabel: "Navegação",
   navLinks: [
@@ -662,7 +743,7 @@ export const footerConfig: FooterConfig = {
   ],
   socialLabel: "Redes Sociais",
   socialLinks: [
-    { iconName: "Instagram", href: "https://instagram.com", label: "Instagram" },
+    { iconName: "Instagram", href: "https://www.instagram.com/extremesportscompetition/", label: "Instagram" },
     { iconName: "Mail", href: "mailto:suporte@extremesportscompetition.com", label: "Email" }
   ],
   tagline: "Saúde e movimento para quem move o mundo.\nSeja Extreme.",
@@ -670,6 +751,6 @@ export const footerConfig: FooterConfig = {
   bottomLinks: [
     { label: "Política de Privacidade", href: "#" },
     { label: "Termos de Uso", href: "#" },
-    { label: "SAC", href: "extreme@extremesportscompetition.com" }
+    { label: "SAC", href: "projetos@extremesportscompetition.com" }
   ]
 };

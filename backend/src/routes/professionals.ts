@@ -7,12 +7,159 @@ import {
   UpdateProfessionalSchema,
   AddSpecialtySchema,
   ListProfessionalsQuerySchema,
+  ProfessionalSubscribeSchema,
 } from "../schemas/professionals.schema";
 import * as professionalsController from "../controllers/professionals.controller";
 import { Errors } from "../lib/response";
 import { errorSchema } from "../lib/swagger-schemas";
 
 export async function professionalsRoutes(app: FastifyInstance) {
+  // ----------------------------------------------------------
+  // POST /professionals/subscribe — qualquer usuário autenticado
+  // Auto-cadastro via assinatura mensal (AbacatePay — apenas cartão)
+  // O profissional é criado automaticamente após o webhook de pagamento
+  // ----------------------------------------------------------
+  app.post("/subscribe", {
+    schema: {
+      tags: ["Professionals"],
+      summary: "Solicita cadastro como profissional via assinatura mensal",
+      description:
+        "Qualquer usuário autenticado pode solicitar cadastro profissional. O profissional é criado automaticamente após confirmação do pagamento via webhook (AbacatePay). Apenas cartão de crédito é aceito.",
+      body: {
+        type: "object",
+        required: ["full_name", "birth_date", "education", "registration_number", "registration_type", "specialties"],
+        properties: {
+          full_name: { type: "string" },
+          birth_date: { type: "string", format: "date" },
+          education: { type: "string" },
+          registration_number: { type: "string" },
+          registration_type: { type: "string" },
+          bio: { type: "string" },
+          specialties: {
+            type: "array",
+            minItems: 1,
+            maxItems: 10,
+            items: {
+              type: "object",
+              required: ["specialty"],
+              properties: {
+                specialty: {
+                  type: "string",
+                  enum: Object.values(ProfessionalSpecialty),
+                },
+                notes: { type: "string", maxLength: 255 },
+              },
+            },
+          },
+        },
+      },
+      response: {
+        201: {
+          description: "Checkout de assinatura criado",
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: { type: "object", additionalProperties: true },
+          },
+        },
+        200: {
+          description: "Assinatura pendente retomada",
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: { type: "object", additionalProperties: true },
+          },
+        },
+        401: errorSchema("Não autorizado"),
+        409: errorSchema("Assinatura já existe"),
+        422: errorSchema("Erro de validação"),
+        503: errorSchema("Gateway de pagamento indisponível"),
+      },
+    },
+    preHandler: [
+      authenticate,
+      async (request, reply) => {
+        const result = ProfessionalSubscribeSchema.safeParse(request.body);
+        if (!result.success) {
+          return Errors.validation(
+            reply,
+            result.error.errors.map((e) => ({
+              field: e.path.join("."),
+              message: e.code === "invalid_enum_value"
+                ? `Valor inválido para "${e.path.join(".")}". Valores aceitos: ${Object.values(ProfessionalSpecialty).join(", ")}.`
+                : e.message,
+            })),
+          );
+        }
+        request.body = result.data;
+      },
+    ],
+    handler: professionalsController.subscribeProfessional,
+  });
+
+  // ----------------------------------------------------------
+  // POST /professionals/subscribe/photo — usuário autenticado
+  // Upload de foto de perfil para a assinatura pendente
+  // ----------------------------------------------------------
+  app.post("/subscribe/photo", {
+    schema: {
+      tags: ["Professionals"],
+      summary: "Upload de foto para assinatura profissional pendente",
+      description: "Aceita `multipart/form-data` com campo `file`. Suporta JPEG, PNG e WebP. Máximo 5 MB. A foto é vinculada ao perfil quando a assinatura for ativada.",
+      consumes: ["multipart/form-data"],
+      body: {
+        type: "object",
+        required: ["file"],
+        properties: {
+          file: { type: "string", format: "binary" },
+        },
+      },
+      response: {
+        200: {
+          description: "Foto enviada",
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: { type: "object", properties: { photo_url: { type: "string" } } },
+          },
+        },
+        401: errorSchema("Não autorizado"),
+        404: errorSchema("Assinatura não encontrada"),
+        422: errorSchema("Formato inválido ou arquivo muito grande"),
+      },
+    },
+    validatorCompiler: ({ httpPart }) => {
+      if (httpPart === "body") return () => true;
+      return () => true;
+    },
+    preHandler: [authenticate],
+    handler: professionalsController.uploadSubscriptionPhoto,
+  });
+
+  // ----------------------------------------------------------
+  // GET /professionals/subscribe/status — usuário autenticado
+  // Retorna o status da assinatura do usuário logado
+  // ----------------------------------------------------------
+  app.get("/subscribe/status", {
+    schema: {
+      tags: ["Professionals"],
+      summary: "Status da assinatura profissional do usuário",
+      response: {
+        200: {
+          description: "Status retornado (null se não há assinatura)",
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: { anyOf: [{ type: "object", additionalProperties: true }, { type: "null" }] },
+          },
+        },
+        401: errorSchema("Não autorizado"),
+      },
+    },
+    preHandler: [authenticate],
+    handler: professionalsController.getSubscriptionStatus,
+  });
+
   // ----------------------------------------------------------
   // GET /professionals
   // ----------------------------------------------------------

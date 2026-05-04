@@ -7,10 +7,76 @@ import * as abacatepay from "../lib/abacatepay";
 
 const PAYMENT_TTL_SECONDS = 900; // 15 minutos
 
+// ============================================================
+// Helper: ativa assinatura profissional após pagamento confirmado
+// Chamado via webhook subscription.completed
+// ============================================================
+
+export async function activateProfessionalSubscription(
+  subscriptionId: string,
+  abacateSubId: string | undefined,
+  log: { info: (...a: unknown[]) => void; error: (...a: unknown[]) => void },
+): Promise<void> {
+  const sub = await prisma.professionalSubscription.findUnique({
+    where: { id: subscriptionId },
+    include: { specialties: { select: { specialty: true, notes: true } } },
+  });
+
+  if (!sub || sub.status === "active") return;
+
+  await prisma.$transaction(async (tx) => {
+    // Re-verifica dentro da transação para evitar duplicação
+    const fresh = await tx.professionalSubscription.findUnique({
+      where: { id: subscriptionId },
+      select: { status: true },
+    });
+    if (fresh?.status === "active") return;
+
+    // Cria o registro de Professional
+    const professional = await tx.professional.create({
+      data: {
+        user_id: sub.user_id,
+        full_name: sub.full_name,
+        birth_date: sub.birth_date,
+        education: sub.education,
+        registration_number: sub.registration_number,
+        registration_type: sub.registration_type,
+        bio: sub.bio,
+        photo_url: sub.photo_url,
+        active: true,
+        specialties: {
+          create: sub.specialties.map((s) => ({
+            specialty: s.specialty,
+            notes: s.notes,
+          })),
+        },
+      },
+    });
+
+    // Promove role do usuário para 'professional'
+    await tx.user.update({
+      where: { id: sub.user_id },
+      data: { role: "professional" },
+    });
+
+    // Ativa a assinatura e vincula ao Professional criado
+    await tx.professionalSubscription.update({
+      where: { id: subscriptionId },
+      data: {
+        status: "active",
+        ...(abacateSubId ? { billing_id: abacateSubId } : {}),
+        professional_id: professional.id,
+      },
+    });
+  });
+
+  log.info({ subscriptionId }, "Assinatura profissional ativada com sucesso");
+}
+
 // ---- helper compartilhado: cria ticket atomicamente ----
 // Usado tanto pelo polling quanto pelo webhook para evitar duplicação
 
-async function processPaymentConfirmation(paymentId: string, log: { info: (...a: unknown[]) => void; error: (...a: unknown[]) => void }): Promise<string | null> {
+export async function processPaymentConfirmation(paymentId: string, log: { info: (...a: unknown[]) => void; error: (...a: unknown[]) => void }): Promise<string | null> {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: { event: { select: { id: true, capacity: true, enrolled: true } } },
@@ -107,20 +173,23 @@ export async function initiateCheckout(
   });
   if (existingTicket) return Errors.conflict(reply, "Você já está inscrito neste evento.");
 
-  // ---- 3. Reutiliza pagamento pendente válido (mesmo método) ----
-  const pendingPayment = await prisma.payment.findFirst({
-    where: { event_id: eventId, user_id: userId, status: "pending", method },
-  });
-  if (pendingPayment && pendingPayment.expires_at > new Date()) {
-    return sendSuccess(reply, {
-      payment_id: pendingPayment.id,
-      billing_id: pendingPayment.billing_id,
-      method: pendingPayment.method,
-      pix_code: pendingPayment.pix_code,
-      checkout_url: pendingPayment.checkout_url,
-      amount_cents: pendingPayment.amount,
-      expires_at: pendingPayment.expires_at,
-    }, 201);
+  // ---- 3. Reutiliza pagamento pendente válido — apenas para PIX ----
+  // Cartão nunca é reutilizado: cada checkout AbacatePay é de uso único e pode estar expirado.
+  if (method === "pix") {
+    const pendingPayment = await prisma.payment.findFirst({
+      where: { event_id: eventId, user_id: userId, status: "pending", method: "pix" },
+    });
+    if (pendingPayment && pendingPayment.expires_at > new Date() && pendingPayment.pix_code) {
+      return sendSuccess(reply, {
+        payment_id: pendingPayment.id,
+        billing_id: pendingPayment.billing_id,
+        method: pendingPayment.method,
+        pix_code: pendingPayment.pix_code,
+        checkout_url: pendingPayment.checkout_url,
+        amount_cents: pendingPayment.amount,
+        expires_at: pendingPayment.expires_at,
+      }, 201);
+    }
   }
 
   // ---- 4. Cria registro Payment ----
@@ -203,7 +272,8 @@ export async function initiateCheckout(
           externalId: payment.id, // devolvido no webhook via data.checkout.externalId
           completionUrl: `${env.FRONTEND_URL}?payment_success=${payment.id}`,
           returnUrl: env.FRONTEND_URL,
-          maxInstallments: 12,
+          // AbacatePay exige mínimo de R$10 por parcela (1000 centavos)
+          maxInstallments: Math.min(12, Math.floor(event.price_cents / 1000)) || 1,
         },
       );
     } catch (err) {
@@ -211,6 +281,11 @@ export async function initiateCheckout(
       request.log.error(err, "AbacatePay card checkout creation failed");
       return Errors.internal(reply);
     }
+
+    request.log.info(
+      { checkoutId: checkout.id, checkoutUrl: checkout.url, checkoutRaw: (checkout as unknown as Record<string, unknown>)._raw },
+      "AbacatePay card checkout criado",
+    );
 
     await prisma.payment.update({
       where: { id: payment.id },
@@ -258,13 +333,16 @@ export async function getPaymentStatus(
     return sendSuccess(reply, { status: payment.status, ticket_id: payment.ticket_id });
   }
 
-  if (payment.expires_at < new Date()) {
-    await prisma.payment.update({ where: { id: paymentId }, data: { status: "expired" } });
-    return sendSuccess(reply, { status: "expired", ticket_id: null });
-  }
+  const isExpiredLocally = payment.expires_at < new Date();
 
   // ---- Fallback: consulta status na AbacatePay (cobre dev sem ngrok e webhooks perdidos) ----
+  // Importante: para cartão, checamos a AbacatePay ANTES de marcar como expirado —
+  // o usuário pode ter pago e a confirmação chegado depois do nosso TTL local.
   if (env.ABACATEPAY_API_KEY && payment.billing_id && payment.billing_id !== "pending") {
+    request.log.info(
+      { billingId: payment.billing_id, method: payment.method, paymentId, isExpiredLocally },
+      "Iniciando consulta AbacatePay",
+    );
     try {
       let abacateStatus: string;
 
@@ -274,6 +352,7 @@ export async function getPaymentStatus(
           env.ABACATEPAY_BASE_URL,
           payment.billing_id,
         );
+        request.log.info({ checkoutNormalized: { id: checkout.id, url: checkout.url, status: checkout.status }, checkoutRaw: (checkout as unknown as Record<string, unknown>)._raw }, "AbacatePay card checkout response");
         abacateStatus = checkout.status;
       } else {
         const charge = await abacatepay.getPixChargeStatus(
@@ -289,14 +368,32 @@ export async function getPaymentStatus(
         "AbacatePay status poll result",
       );
 
-      const isPaid = ["PAID", "COMPLETED", "APPROVED"].includes(abacateStatus.toUpperCase());
+      const upperStatus = abacateStatus.toUpperCase();
+      const isPaid = ["PAID", "COMPLETED", "APPROVED"].includes(upperStatus);
+
       if (isPaid) {
         const ticketId = await processPaymentConfirmation(paymentId, request.log);
         return sendSuccess(reply, { status: "paid", ticket_id: ticketId });
       }
+
+      // Se a AbacatePay confirma que expirou/cancelou — ou nosso TTL expirou — marca localmente
+      const isAbacateExpired = ["EXPIRED", "CANCELLED", "REFUNDED"].includes(upperStatus);
+      if (isAbacateExpired || isExpiredLocally) {
+        await prisma.payment.update({ where: { id: paymentId }, data: { status: "expired" } });
+        return sendSuccess(reply, { status: "expired", ticket_id: null });
+      }
     } catch (err) {
       request.log.warn(err, "Falha ao consultar status na AbacatePay durante polling");
+      // Se falhou a consulta e expirou localmente, marca como expirado
+      if (isExpiredLocally) {
+        await prisma.payment.update({ where: { id: paymentId }, data: { status: "expired" } });
+        return sendSuccess(reply, { status: "expired", ticket_id: null });
+      }
     }
+  } else if (isExpiredLocally) {
+    // Sem API key ou billing_id inválido — usa apenas TTL local
+    await prisma.payment.update({ where: { id: paymentId }, data: { status: "expired" } });
+    return sendSuccess(reply, { status: "expired", ticket_id: null });
   }
 
   return sendSuccess(reply, { status: payment.status, ticket_id: payment.ticket_id });
@@ -376,10 +473,18 @@ export async function abacatepayWebhook(
   // ---- 3. checkout.completed (Cartão) ----
   if (event === "checkout.completed") {
     const dataObj = (body.data as Record<string, unknown> | undefined) ?? {};
-    const checkoutData = (dataObj.checkout as Record<string, unknown> | undefined) ?? {};
+    // AbacatePay pode enviar os campos direto em data { id, externalId }
+    // ou aninhados em data.checkout { id, externalId } — suportamos os dois.
+    const checkoutData = (
+      dataObj.checkout && typeof dataObj.checkout === "object"
+        ? dataObj.checkout
+        : dataObj
+    ) as Record<string, unknown>;
 
     const externalId = checkoutData["externalId"] as string | undefined; // nosso payment.id
     const abacateCheckoutId = checkoutData["id"] as string | undefined;
+
+    request.log.info({ externalId, abacateCheckoutId, hasCheckoutWrapper: !!dataObj.checkout }, "webhook checkout.completed recebido");
 
     const payment = await prisma.payment.findFirst({
       where: {
@@ -399,6 +504,99 @@ export async function abacatepayWebhook(
     } catch (err) {
       request.log.error(err, "Falha ao processar webhook cartão");
       return reply.status(500).send({ error: "Internal error" });
+    }
+
+    return reply.status(200).send({ received: true });
+  }
+
+  // ---- 4. subscription.completed — primeira cobrança da assinatura confirmada ----
+  if (event === "subscription.completed") {
+    const dataObj = (body.data as Record<string, unknown> | undefined) ?? {};
+    const subData = (dataObj.subscription as Record<string, unknown> | undefined) ?? {};
+
+    const externalId = subData["externalId"] as string | undefined; // nosso subscription.id
+    const abacateSubId = subData["id"] as string | undefined;
+
+    const sub = await prisma.professionalSubscription.findFirst({
+      where: {
+        OR: [
+          ...(externalId ? [{ id: externalId }] : []),
+          ...(abacateSubId ? [{ billing_id: abacateSubId }] : []),
+        ],
+      },
+      select: { id: true, status: true },
+    });
+
+    if (!sub || sub.status === "active") {
+      return reply.status(200).send({ received: true });
+    }
+
+    try {
+      await activateProfessionalSubscription(sub.id, abacateSubId, request.log);
+    } catch (err) {
+      request.log.error(err, "Falha ao ativar assinatura profissional");
+      return reply.status(500).send({ error: "Internal error" });
+    }
+
+    return reply.status(200).send({ received: true });
+  }
+
+  // ---- 5. subscription.renewed — cobrança recorrente confirmada ----
+  if (event === "subscription.renewed") {
+    const dataObj = (body.data as Record<string, unknown> | undefined) ?? {};
+    const subData = (dataObj.subscription as Record<string, unknown> | undefined) ?? {};
+    const abacateSubId = subData["id"] as string | undefined;
+
+    if (abacateSubId) {
+      await prisma.professionalSubscription.updateMany({
+        where: { billing_id: abacateSubId, status: "past_due" },
+        data: { status: "active" },
+      });
+    }
+
+    return reply.status(200).send({ received: true });
+  }
+
+  // ---- 6. subscription.cancelled — assinatura cancelada ----
+  if (event === "subscription.cancelled") {
+    const dataObj = (body.data as Record<string, unknown> | undefined) ?? {};
+    const subData = (dataObj.subscription as Record<string, unknown> | undefined) ?? {};
+    const abacateSubId = subData["id"] as string | undefined;
+
+    if (abacateSubId) {
+      const sub = await prisma.professionalSubscription.findFirst({
+        where: { billing_id: abacateSubId },
+        select: { id: true, user_id: true, professional_id: true },
+      });
+
+      if (sub) {
+        try {
+          await prisma.$transaction(async (tx) => {
+            await tx.professionalSubscription.update({
+              where: { id: sub.id },
+              data: { status: "cancelled" },
+            });
+
+            if (sub.professional_id) {
+              await tx.professional.update({
+                where: { id: sub.professional_id },
+                data: { active: false, deleted_at: new Date() },
+              });
+            }
+
+            // Rebaixa role para 'user'
+            await tx.user.update({
+              where: { id: sub.user_id },
+              data: { role: "user" },
+            });
+          });
+
+          request.log.info({ subscriptionId: sub.id }, "Assinatura profissional cancelada");
+        } catch (err) {
+          request.log.error(err, "Falha ao processar cancelamento de assinatura");
+          return reply.status(500).send({ error: "Internal error" });
+        }
+      }
     }
 
     return reply.status(200).send({ received: true });

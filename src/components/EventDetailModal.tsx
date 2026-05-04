@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  X, RefreshCw, Calendar, MapPin, Users, Trophy,
+  X, RefreshCw, Calendar, MapPin, Users, Trophy, Gift,
   Copy, Check, ExternalLink, Clock, Lock, Ticket, AlertCircle,
   Zap, CreditCard,
 } from 'lucide-react';
-import { fetchLandingEventDetail, enrollFreeEvent, initiateCheckout, getPaymentStatus, ApiError } from '../lib/api';
+import { fetchLandingEventDetail, enrollFreeEvent, initiateCheckout, getPaymentStatus, devSimulateCardCheckout, ApiError } from '../lib/api';
 import type { PaymentMethod } from '../lib/api';
 import type { LandingEventDetail, PaymentSession } from '../types/api';
 import { mediaUrl } from '../lib/utils';
@@ -132,6 +132,8 @@ function MethodSelector({
 
 // ---- checkout panel (PIX ou cartão) ----
 
+const IS_DEV = import.meta.env.DEV;
+
 function CheckoutPanel({
   session,
   method,
@@ -144,6 +146,7 @@ function CheckoutPanel({
   onPaid: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [simulating, setSimulating] = useState(false);
   const [countdown, setCountdown] = useState(() => formatCountdown(session.expires_at));
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -199,6 +202,18 @@ function CheckoutPanel({
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
+  };
+
+  const handleDevSimulate = async () => {
+    if (!session.billing_id || simulating) return;
+    setSimulating(true);
+    try {
+      await devSimulateCardCheckout(session.billing_id);
+    } catch {
+      // ignora — o polling vai confirmar em até 3s
+    } finally {
+      setSimulating(false);
+    }
   };
 
   return (
@@ -282,6 +297,16 @@ function CheckoutPanel({
             <ExternalLink className="w-4 h-4" />
             Abrir página novamente
           </a>
+          {IS_DEV && (
+            <button
+              onClick={handleDevSimulate}
+              disabled={simulating}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[#FF6B00] text-xs font-bold border border-[#FF6B00]/30 hover:bg-[#FF6B00]/10 transition-colors disabled:opacity-50"
+            >
+              {simulating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+              {simulating ? 'Simulando...' : '[DEV] Simular pagamento aprovado'}
+            </button>
+          )}
         </div>
       )}
 
@@ -566,6 +591,15 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
                       <p className="text-white/70 leading-relaxed">{detail.rules}</p>
                     </div>
                   )}
+                  {/* Recompensa */}
+                  <div className="p-4 bg-gradient-to-r from-[#00FF87]/10 to-[#00FF87]/5 rounded-xl border border-[#00FF87]/20 flex items-start gap-3">
+                    <Gift className="w-5 h-5 text-[#00FF87] flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-[#00FF87] uppercase tracking-wider mb-1">Recompensa</p>
+                      <p className="text-white/80 text-sm leading-relaxed">{detail.reward}</p>
+                    </div>
+                  </div>
+
                   {detail.ranking_points !== null && detail.ranking_points > 0 && (
                     <div className="p-4 bg-gradient-to-r from-[#4169E1]/10 to-[#FF6B00]/10 rounded-xl border border-white/5 flex items-center gap-3">
                       <Trophy className="w-5 h-5 text-[#FF6B00] flex-shrink-0" />

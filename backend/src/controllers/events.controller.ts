@@ -159,6 +159,7 @@ export async function listEvents(
         status: true,
         cover_image_url: true,
         ranking_points: true,
+        reward: true,
         organizer: { select: { id: true, full_name: true } },
       },
       orderBy,
@@ -204,6 +205,7 @@ export async function getEvent(
       status: true,
       cover_image_url: true,
       ranking_points: true,
+      reward: true,
       created_at: true,
       updated_at: true,
       organizer: { select: { id: true, full_name: true } },
@@ -242,6 +244,7 @@ export async function createEvent(
       price_cents: body.price_cents,
       capacity: body.capacity,
       ranking_points: body.ranking_points,
+      reward: body.reward,
     },
     select: {
       id: true,
@@ -253,6 +256,7 @@ export async function createEvent(
       price_cents: true,
       capacity: true,
       status: true,
+      reward: true,
       created_at: true,
     },
   });
@@ -300,6 +304,7 @@ export async function updateEvent(
   if (body.status !== undefined) data.status = body.status;
   if (body.featured !== undefined && role === "admin") data.featured = body.featured;
   if (body.ranking_points !== undefined) data.ranking_points = body.ranking_points;
+  if (body.reward !== undefined) data.reward = body.reward;
 
   const updated = await prisma.event.update({
     where: { id },
@@ -319,6 +324,7 @@ export async function updateEvent(
       enrolled: true,
       status: true,
       ranking_points: true,
+      reward: true,
       updated_at: true,
     },
   });

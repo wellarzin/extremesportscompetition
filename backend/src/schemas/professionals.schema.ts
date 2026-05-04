@@ -49,6 +49,29 @@ export const AddSpecialtySchema = z
 
 export type AddSpecialtyInput = z.infer<typeof AddSpecialtySchema>;
 
+// Schema para auto-cadastro via assinatura (qualquer usuário autenticado)
+export const ProfessionalSubscribeSchema = z
+  .object({
+    full_name: z.string().min(3).max(255).trim(),
+    birth_date: z.string().date("Data inválida. Use YYYY-MM-DD."),
+    education: z.string().min(3).max(255).trim(),
+    registration_number: z.string().min(1).max(50).trim(),
+    registration_type: z.string().min(2).max(20).trim().toUpperCase(),
+    bio: z.string().max(2000).trim().optional(),
+    specialties: z
+      .array(
+        z.object({
+          specialty: z.nativeEnum(ProfessionalSpecialty),
+          notes: z.string().max(255).trim().optional(),
+        })
+      )
+      .min(1, "Ao menos uma especialidade é obrigatória.")
+      .max(10),
+  })
+  .strict();
+
+export type ProfessionalSubscribeInput = z.infer<typeof ProfessionalSubscribeSchema>;
+
 export const ListProfessionalsQuerySchema = z.object({
   specialty: z.nativeEnum(ProfessionalSpecialty).optional(),
   page: z.coerce.number().int().positive().default(1),

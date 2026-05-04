@@ -18,6 +18,7 @@ import type {
 const BCRYPT_ROUNDS = 12;
 const MAX_SPORT_PREFERENCES = 5;
 const UPLOADS_DIR = join(process.cwd(), "uploads", "avatars");
+const DELIVERY_PROOFS_DIR = join(process.cwd(), "uploads", "delivery-proofs");
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -58,6 +59,7 @@ export async function getMe(request: FastifyRequest, reply: FastifyReply) {
       full_name: true,
       email: true,
       photo_url: true,
+      delivery_proof_url: true,
       birth_date: true,
       document_type: true,
       document_number: true,
@@ -273,6 +275,72 @@ export async function uploadAvatar(request: FastifyRequest, reply: FastifyReply)
   });
 
   return sendSuccess(reply, { photo_url });
+}
+
+// ============================================================
+// POST /users/me/delivery-proof
+// ============================================================
+
+export async function uploadDeliveryProof(request: FastifyRequest, reply: FastifyReply) {
+  const userId = request.user.sub;
+
+  const data = await (request as any).file({
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB — comprovantes podem ser PDFs escaneados em alta res
+  });
+
+  if (!data) {
+    return Errors.validation(reply, [{ field: "file", message: "Arquivo não encontrado na requisição." }]);
+  }
+
+  const chunks: Buffer[] = [];
+  let totalSize = 0;
+
+  for await (const chunk of data.file) {
+    chunks.push(chunk as Buffer);
+    totalSize += (chunk as Buffer).length;
+    if (totalSize > 10 * 1024 * 1024) {
+      return Errors.validation(reply, [{ field: "file", message: "Arquivo excede 10 MB." }]);
+    }
+  }
+
+  const fullBuffer = Buffer.concat(chunks);
+
+  if (fullBuffer.length < 12) {
+    return Errors.validation(reply, [{ field: "file", message: "Arquivo inválido." }]);
+  }
+
+  const mime = detectMimeFromBuffer(fullBuffer);
+  if (!mime || !ALLOWED_MIME[mime]) {
+    return Errors.validation(reply, [{ field: "file", message: "Formato não suportado. Use JPEG, PNG ou WebP." }]);
+  }
+
+  const ext = ALLOWED_MIME[mime];
+  const filename = `${randomUUID()}${ext}`;
+
+  try {
+    mkdirSync(DELIVERY_PROOFS_DIR, { recursive: true });
+  } catch {
+    return Errors.internal(reply);
+  }
+
+  const filePath = join(DELIVERY_PROOFS_DIR, filename);
+  const ws = createWriteStream(filePath);
+  ws.write(fullBuffer);
+  ws.end();
+
+  await new Promise<void>((resolve, reject) => {
+    ws.on("finish", resolve);
+    ws.on("error", reject);
+  });
+
+  const delivery_proof_url = `/uploads/delivery-proofs/${filename}`;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { delivery_proof_url },
+  });
+
+  return sendSuccess(reply, { delivery_proof_url });
 }
 
 // ============================================================

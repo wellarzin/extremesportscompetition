@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { heroConfig } from '../config';
+import { heroConfig, companiesConfig } from '../config';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useAuthModal } from '../contexts/AuthModalContext';
 import { useFeaturedEvents } from '../hooks/useFeaturedEvents';
@@ -11,7 +11,7 @@ import { ProfileModal } from '../components/ProfileModal';
 import type { FeaturedEvent } from '../types/api';
 import {
   Menu, X, User, ChevronLeft, ChevronRight,
-  Calendar, MapPin, Tag, Check,
+  Calendar, MapPin, Tag, Check, Crown,
 } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -207,11 +207,24 @@ export function Hero() {
             <button
               onClick={() => setMenuOpen(true)}
               aria-label="Abrir menu"
-              className="w-10 h-10 flex items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-colors"
+              className="lg:hidden w-10 h-10 flex items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-colors"
             >
               <Menu className="w-5 h-5 text-white" />
             </button>
             <img src="/logo.png" alt="Extreme Sports" className="h-10 md:h-12 w-auto" />
+          </div>
+
+          {/* Nav links — visíveis apenas em desktop */}
+          <div className="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+            {heroConfig.navLinks.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                className="px-4 py-2 text-white/55 hover:text-white text-sm font-medium rounded-lg hover:bg-white/8 transition-all duration-200"
+              >
+                {link.label}
+              </a>
+            ))}
           </div>
 
           <div className="flex items-center gap-4">
@@ -333,6 +346,26 @@ export function Hero() {
               </div>
             </div>
           ) : null}
+        </div>
+      </div>
+
+      {/* Master Sponsor badge */}
+      <div className="absolute bottom-10 left-4 md:left-8 z-20 hidden sm:flex items-center gap-3">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 backdrop-blur-sm border border-[#FF6B00]/20">
+          <Crown className="w-3 h-3 text-[#FF6B00] flex-shrink-0" />
+          <span className="text-white/35 text-[10px] font-medium tracking-widest uppercase">Master</span>
+          <div className="w-px h-3 bg-white/15" />
+          <span
+            className="text-xs font-extrabold tracking-tight"
+            style={{
+              background: 'linear-gradient(135deg, #ffffff 40%, #FF6B00 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+          >
+            {companiesConfig.sponsors.master.logoText}
+          </span>
         </div>
       </div>
 

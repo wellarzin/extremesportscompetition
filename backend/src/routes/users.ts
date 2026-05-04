@@ -149,6 +149,35 @@ export async function usersRoutes(app: FastifyInstance) {
   });
 
   // ----------------------------------------------------------
+  // POST /users/me/delivery-proof
+  // ----------------------------------------------------------
+  app.post("/me/delivery-proof", {
+    ...AUTHENTICATED,
+    schema: {
+      tags: ["Users"],
+      summary: "Upload de comprovante de 200+ viagens/entregas",
+      description: "Aceita `multipart/form-data` com campo `file`. Suporta JPEG, PNG e WebP. Máximo 10 MB. MIME validado via magic bytes.",
+      consumes: ["multipart/form-data"],
+      response: {
+        200: {
+          description: "Comprovante salvo",
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: { delivery_proof_url: { type: "string" } },
+            },
+          },
+        },
+        401: errorSchema("Não autorizado"),
+        422: errorSchema("Formato inválido ou arquivo muito grande"),
+      },
+    },
+    handler: usersController.uploadDeliveryProof,
+  });
+
+  // ----------------------------------------------------------
   // DELETE /users/me
   // ----------------------------------------------------------
   app.delete("/me", {

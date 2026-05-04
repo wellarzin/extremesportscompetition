@@ -24,6 +24,7 @@ export const CreateEventSchema = z
     price_cents: z.number().int().min(0).default(0),
     capacity: z.number().int().positive().optional(),
     ranking_points: z.number().int().min(0).optional(),
+    reward: z.string().min(3).max(500).trim(),
   })
   .strict()
   .superRefine((d, ctx) => {
@@ -63,6 +64,7 @@ export const UpdateEventSchema = z
     status: z.nativeEnum(EventStatus).optional(),
     featured: z.boolean().optional(),
     ranking_points: z.number().int().min(0).nullable().optional(),
+    reward: z.string().min(3).max(500).trim().optional(),
   })
   .strict()
   .refine((d) => Object.keys(d).length > 0, { message: "Ao menos um campo deve ser fornecido." });

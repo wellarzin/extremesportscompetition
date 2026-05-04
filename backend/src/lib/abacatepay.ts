@@ -156,7 +156,7 @@ export async function findOrCreateProduct(
 // ============================================================
 // Cartão — Hosted checkout
 // POST /checkouts/create
-// GET  /checkouts/check?id=:id
+// GET  /checkouts/get?id=:id
 // ============================================================
 
 export interface AbacateCreateCardCheckoutInput {
@@ -174,9 +174,14 @@ export interface AbacateCardCheckout {
 }
 
 function normalizeCardCheckout(raw: Record<string, unknown>): AbacateCardCheckout {
-  const data = (raw.data ?? raw) as Record<string, unknown>;
+  // AbacatePay pode retornar: { data: { ... } } ou { data: { checkout: { ... } } }
+  let data = (raw.data ?? raw) as Record<string, unknown>;
+  // Desempacota nível extra se vier aninhado em "checkout"
+  if (data.checkout && typeof data.checkout === "object") {
+    data = data.checkout as Record<string, unknown>;
+  }
   return {
-    id: data.id as string,
+    id: (data.id as string | undefined) ?? "",
     url: (data.url as string | undefined) ?? "",
     status: (data.status as AbacateCardCheckout["status"]) ?? "PENDING",
   };
@@ -208,14 +213,138 @@ export async function getCardCheckoutStatus(
   apiKey: string,
   baseUrl: string,
   checkoutId: string,
-): Promise<AbacateCardCheckout> {
+): Promise<AbacateCardCheckout & { _raw?: unknown }> {
   const raw = await abacateRequest<Record<string, unknown>>(
     "GET",
     `/checkouts/get?id=${encodeURIComponent(checkoutId)}`,
     apiKey,
     baseUrl,
   );
-  return normalizeCardCheckout(raw);
+  const normalized = normalizeCardCheckout(raw);
+  // _raw exposto para logging no controller — removido após diagnóstico
+  return { ...normalized, _raw: raw };
+}
+
+// ============================================================
+// Assinaturas — Subscription (apenas cartão de crédito)
+// POST /subscriptions/create
+// POST /subscriptions/cancel
+// Docs: https://docs.abacatepay.com/pages/subscriptions/create
+// ============================================================
+
+export async function findOrCreateSubscriptionProduct(
+  apiKey: string,
+  baseUrl: string,
+  externalId: string,
+  name: string,
+  priceCents: number,
+  cycle: "WEEKLY" | "MONTHLY" | "SEMIANNUALLY" | "ANNUALLY" = "MONTHLY",
+): Promise<string> {
+  // Tenta encontrar produto de assinatura existente pelo externalId
+  const listRaw = await abacateRequest<Record<string, unknown>>(
+    "GET",
+    `/products/list?externalId=${encodeURIComponent(externalId)}&limit=1`,
+    apiKey,
+    baseUrl,
+  );
+
+  const listData = (listRaw.data as unknown[] | undefined) ?? [];
+  if (listData.length > 0) {
+    const existing = listData[0] as Record<string, unknown>;
+    return existing.id as string;
+  }
+
+  // Cria produto com ciclo de cobrança
+  const createRaw = await abacateRequest<Record<string, unknown>>(
+    "POST",
+    "/products/create",
+    apiKey,
+    baseUrl,
+    {
+      externalId,
+      name,
+      price: priceCents,
+      currency: "BRL",
+      cycle,
+    },
+  );
+
+  const product = (createRaw.data ?? createRaw) as Record<string, unknown>;
+  return product.id as string;
+}
+
+export interface AbacateCreateSubscriptionCheckoutInput {
+  productId: string;
+  externalId: string;      // nosso subscription.id — devolvido no webhook via data.subscription.externalId
+  completionUrl: string;
+  returnUrl: string;
+}
+
+export interface AbacateSubscriptionCheckout {
+  id: string;
+  url: string;
+  status: string;
+}
+
+function normalizeSubscriptionCheckout(raw: Record<string, unknown>): AbacateSubscriptionCheckout {
+  const data = (raw.data ?? raw) as Record<string, unknown>;
+  return {
+    id: data.id as string,
+    url: (data.url as string | undefined) ?? "",
+    status: (data.status as string | undefined) ?? "PENDING",
+  };
+}
+
+export async function createSubscriptionCheckout(
+  apiKey: string,
+  baseUrl: string,
+  input: AbacateCreateSubscriptionCheckoutInput,
+): Promise<AbacateSubscriptionCheckout> {
+  const raw = await abacateRequest<Record<string, unknown>>(
+    "POST",
+    "/subscriptions/create",
+    apiKey,
+    baseUrl,
+    {
+      items: [{ id: input.productId, quantity: 1 }],
+      externalId: input.externalId,
+      completionUrl: input.completionUrl,
+      returnUrl: input.returnUrl,
+    },
+  );
+  return normalizeSubscriptionCheckout(raw);
+}
+
+export async function getSubscriptionStatus(
+  apiKey: string,
+  baseUrl: string,
+  subscriptionId: string,
+): Promise<{ id: string; status: string }> {
+  const raw = await abacateRequest<Record<string, unknown>>(
+    "GET",
+    `/subscriptions/get?id=${encodeURIComponent(subscriptionId)}`,
+    apiKey,
+    baseUrl,
+  );
+  const data = (raw.data ?? raw) as Record<string, unknown>;
+  return {
+    id: data.id as string,
+    status: (data.status as string | undefined) ?? "PENDING",
+  };
+}
+
+export async function cancelSubscription(
+  apiKey: string,
+  baseUrl: string,
+  subscriptionId: string,
+): Promise<void> {
+  await abacateRequest<Record<string, unknown>>(
+    "POST",
+    "/subscriptions/cancel",
+    apiKey,
+    baseUrl,
+    { id: subscriptionId },
+  );
 }
 
 // ============================================================

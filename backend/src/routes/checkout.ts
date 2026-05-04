@@ -109,12 +109,10 @@ export async function checkoutRoutes(app: FastifyInstance) {
       tags: ["Checkout"],
       summary: "Webhook do AbacatePay",
       description:
-        "Endpoint chamado pelo AbacatePay quando o pagamento PIX é confirmado. Protegido via `?secret=ABACATEPAY_WEBHOOK_SECRET`.",
+        "Endpoint chamado pelo AbacatePay ao confirmar pagamentos (PIX, cartão) e eventos de assinatura. " +
+        "Validado via HMAC-SHA256 no header `x-abacatepay-signature` (formato: `sha256=<hex>`). " +
+        "Configure a URL `<API_URL>/api/v1/checkout/webhook/abacatepay` no painel do AbacatePay.",
       security: [],
-      querystring: {
-        type: "object",
-        properties: { secret: { type: "string" } },
-      },
       body: { type: "object", additionalProperties: true },
       response: {
         200: {
