@@ -256,7 +256,7 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
 
   // ---- Payload máximo global: 100kb ----
   // Registrado também com charset para compatibilidade com Swagger UI
-  const parseJson = (req: import("fastify").FastifyRequest, body: string, done: import("fastify").ContentTypeParserDoneFunction) => {
+  const parseJson = (req: import("fastify").FastifyRequest, body: string, done: (err: Error | null, body?: unknown) => void) => {
     try {
       (req.raw as import("http").IncomingMessage & { rawBody?: string }).rawBody = body;
       const cleaned = body.replace(/^\uFEFF/, "").trimStart();
