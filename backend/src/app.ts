@@ -261,7 +261,11 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
     function (req, body, done) {
       try {
         (req.raw as import("http").IncomingMessage & { rawBody?: string }).rawBody = body as string;
-        const cleaned = (body as string).replace(/^\uFEFF/, "").trimStart();
+        const cleaned = (body as string)
+          .replace(/^\uFEFF/, "")
+          .trimStart()
+          .replace(/\r\n/g, " ")
+          .replace(/[\r\n]/g, " ");
         done(null, JSON.parse(cleaned));
       } catch {
         const error = new Error("Payload inválido. Verifique se o JSON está bem formatado.") as Error & { statusCode: number };
