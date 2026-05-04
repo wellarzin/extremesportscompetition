@@ -1,5 +1,5 @@
 # ---- Stage 1: Build ----
-FROM node:22-alpine AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -14,9 +14,12 @@ COPY src ./src
 RUN npm run build
 
 # ---- Stage 2: Production ----
-FROM node:22-alpine AS runner
+FROM node:22-slim AS runner
 
 WORKDIR /app
+
+# Prisma precisa de OpenSSL para o query engine
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 RUN npm ci --omit=dev
@@ -25,6 +28,9 @@ COPY prisma ./prisma
 RUN npx prisma generate
 
 COPY --from=builder /app/dist ./dist
+
+# Diretório de uploads (imagens de capa e perfis)
+RUN mkdir -p uploads/covers uploads/professionals
 
 EXPOSE 3333
 
