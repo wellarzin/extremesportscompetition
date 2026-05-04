@@ -17,7 +17,6 @@ import { landingRoutes } from "./routes/landing";
 import { checkoutRoutes } from "./routes/checkout";
 import { devRoutes } from "./routes/dev";
 
-// Redis opcional — usado para rate limiting distribuído
 let redisClient: import("ioredis").Redis | undefined;
 
 async function buildRedis() {
