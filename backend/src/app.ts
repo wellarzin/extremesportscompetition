@@ -230,10 +230,15 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
   });
 
   // ---- JWT RS256 ----
+  // Chaves armazenadas em base64 nas variáveis de ambiente para evitar
+  // problemas com escaping de \n em diferentes plataformas de hosting.
+  const privateKey = Buffer.from(env.JWT_PRIVATE_KEY, "base64").toString("utf8");
+  const publicKey = Buffer.from(env.JWT_PUBLIC_KEY, "base64").toString("utf8");
+
   await app.register(jwt, {
     secret: {
-      private: env.JWT_PRIVATE_KEY.replace(/\\n/g, "\n"),
-      public: env.JWT_PUBLIC_KEY.replace(/\\n/g, "\n"),
+      private: privateKey,
+      public: publicKey,
     },
     sign: { algorithm: "RS256" },
     verify: { algorithms: ["RS256"] },
