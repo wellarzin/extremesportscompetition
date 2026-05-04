@@ -255,21 +255,21 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
   });
 
   // ---- Payload máximo global: 100kb ----
-  // Registrado também com charset para compatibilidade com Swagger UI
-  const parseJson = (req: import("fastify").FastifyRequest, body: string, done: (err: Error | null, body?: unknown) => void) => {
-    try {
-      (req.raw as import("http").IncomingMessage & { rawBody?: string }).rawBody = body;
-      const cleaned = body.replace(/^\uFEFF/, "").trimStart();
-      done(null, JSON.parse(cleaned));
-    } catch {
-      const error = new Error("Payload inválido. Verifique se o JSON está bem formatado.") as Error & { statusCode: number };
-      error.statusCode = 400;
-      done(error, undefined);
+  app.addContentTypeParser(
+    "application/json",
+    { parseAs: "string", bodyLimit: 100 * 1024 },
+    function (req, body, done) {
+      try {
+        (req.raw as import("http").IncomingMessage & { rawBody?: string }).rawBody = body as string;
+        const cleaned = (body as string).replace(/^\uFEFF/, "").trimStart();
+        done(null, JSON.parse(cleaned));
+      } catch {
+        const error = new Error("Payload inválido. Verifique se o JSON está bem formatado.") as Error & { statusCode: number };
+        error.statusCode = 400;
+        done(error, undefined);
+      }
     }
-  };
-
-  app.removeAllContentTypeParsers();
-  app.addContentTypeParser(/^application\/json/, { parseAs: "string", bodyLimit: 100 * 1024 }, parseJson);
+  );
 
   // ---- Health check ----
   app.get("/health", { schema: { hide: true } }, async () => ({
