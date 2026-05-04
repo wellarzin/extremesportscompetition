@@ -268,9 +268,8 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
     }
   };
 
-  app.addContentTypeParser("application/json", { parseAs: "string", bodyLimit: 100 * 1024 }, parseJson);
-  app.addContentTypeParser("application/json; charset=utf-8", { parseAs: "string", bodyLimit: 100 * 1024 }, parseJson);
-  app.addContentTypeParser("application/json; charset=UTF-8", { parseAs: "string", bodyLimit: 100 * 1024 }, parseJson);
+  app.removeAllContentTypeParsers();
+  app.addContentTypeParser(/^application\/json/, { parseAs: "string", bodyLimit: 100 * 1024 }, parseJson);
 
   // ---- Health check ----
   app.get("/health", { schema: { hide: true } }, async () => ({
