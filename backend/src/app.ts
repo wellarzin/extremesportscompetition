@@ -255,11 +255,10 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
   });
 
   // ---- Payload máximo global: 100kb ----
-  // Registrado para application/json e application/json; charset=utf-8 (Swagger UI envia com charset)
-  const jsonParser = function (req: import("fastify").FastifyRequest["raw"], body: string, done: (err: Error | null, body?: unknown) => void) {
+  // Registrado também com charset para compatibilidade com Swagger UI
+  const parseJson = (req: import("fastify").FastifyRequest, body: string, done: import("fastify").ContentTypeParserDoneFunction) => {
     try {
-      (req as import("http").IncomingMessage & { rawBody?: string }).rawBody = body;
-      // Remove BOM e espaços iniciais
+      (req.raw as import("http").IncomingMessage & { rawBody?: string }).rawBody = body;
       const cleaned = body.replace(/^\uFEFF/, "").trimStart();
       done(null, JSON.parse(cleaned));
     } catch {
@@ -269,9 +268,9 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
     }
   };
 
-  app.addContentTypeParser("application/json", { parseAs: "string", bodyLimit: 100 * 1024 }, jsonParser);
-  app.addContentTypeParser("application/json; charset=utf-8", { parseAs: "string", bodyLimit: 100 * 1024 }, jsonParser);
-  app.addContentTypeParser("application/json; charset=UTF-8", { parseAs: "string", bodyLimit: 100 * 1024 }, jsonParser);
+  app.addContentTypeParser("application/json", { parseAs: "string", bodyLimit: 100 * 1024 }, parseJson);
+  app.addContentTypeParser("application/json; charset=utf-8", { parseAs: "string", bodyLimit: 100 * 1024 }, parseJson);
+  app.addContentTypeParser("application/json; charset=UTF-8", { parseAs: "string", bodyLimit: 100 * 1024 }, parseJson);
 
   // ---- Health check ----
   app.get("/health", { schema: { hide: true } }, async () => ({
