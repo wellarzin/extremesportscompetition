@@ -254,25 +254,24 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
     verify: { algorithms: ["RS256"] },
   });
 
-  // ---- Payload máximo global: 10kb ----
-  app.addContentTypeParser(
-    "application/json",
-    { parseAs: "string", bodyLimit: 10 * 1024 },
-    function (req, body, done) {
-      try {
-        // Salva o body bruto no request do Node — usado para validação HMAC do webhook
-        (req.raw as import("http").IncomingMessage & { rawBody?: string }).rawBody = body as string;
-        // Remove BOM (U+FEFF) e outros caracteres de controle invisíveis
-        // que quebram JSON.parse quando o cliente envia UTF-8 with BOM
-        const cleaned = (body as string).replace(/^\uFEFF/, "").trimStart();
-        done(null, JSON.parse(cleaned));
-      } catch (err) {
-        const error = new Error("Payload inválido. Verifique se o JSON não contém quebras de linha dentro de strings ou caracteres especiais.") as Error & { statusCode: number };
-        error.statusCode = 400;
-        done(error, undefined);
-      }
+  // ---- Payload máximo global: 100kb ----
+  // Registrado para application/json e application/json; charset=utf-8 (Swagger UI envia com charset)
+  const jsonParser = function (req: import("fastify").FastifyRequest["raw"], body: string, done: (err: Error | null, body?: unknown) => void) {
+    try {
+      (req as import("http").IncomingMessage & { rawBody?: string }).rawBody = body;
+      // Remove BOM e espaços iniciais
+      const cleaned = body.replace(/^\uFEFF/, "").trimStart();
+      done(null, JSON.parse(cleaned));
+    } catch {
+      const error = new Error("Payload inválido. Verifique se o JSON está bem formatado.") as Error & { statusCode: number };
+      error.statusCode = 400;
+      done(error, undefined);
     }
-  );
+  };
+
+  app.addContentTypeParser("application/json", { parseAs: "string", bodyLimit: 100 * 1024 }, jsonParser);
+  app.addContentTypeParser("application/json; charset=utf-8", { parseAs: "string", bodyLimit: 100 * 1024 }, jsonParser);
+  app.addContentTypeParser("application/json; charset=UTF-8", { parseAs: "string", bodyLimit: 100 * 1024 }, jsonParser);
 
   // ---- Health check ----
   app.get("/health", { schema: { hide: true } }, async () => ({
