@@ -2,6 +2,20 @@ import { X, BookOpen, Award, Trophy } from 'lucide-react';
 import type { LandingProfessional } from '../types/api';
 import { mediaUrl } from '../lib/utils';
 
+const EDUCATION_LABELS: Record<string, string> = {
+  superior_completo: 'Superior Completo',
+  superior_incompleto: 'Superior Incompleto',
+  tecnico: 'Técnico',
+  pos_graduacao: 'Pós-graduação',
+  mestrado: 'Mestrado',
+  doutorado: 'Doutorado',
+  medio_completo: 'Ensino Médio Completo',
+};
+
+function formatEducation(value: string): string {
+  return EDUCATION_LABELS[value] ?? value;
+}
+
 export const PLACEHOLDER_AVATAR =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a1a1a"/><circle cx="50" cy="38" r="20" fill="%23333"/><ellipse cx="50" cy="85" rx="32" ry="22" fill="%23333"/></svg>';
 
@@ -55,7 +69,7 @@ export function ProfessionalProfileModal({ professional, index, onClose }: Profe
               </div>
               <div>
                 <p className="text-xs text-white/30 mb-0.5">Formação</p>
-                <p className="text-sm text-white font-medium">{professional.education}</p>
+                <p className="text-sm text-white font-medium">{formatEducation(professional.education)}</p>
               </div>
             </div>
 
@@ -65,7 +79,9 @@ export function ProfessionalProfileModal({ professional, index, onClose }: Profe
               </div>
               <div>
                 <p className="text-xs text-white/30 mb-0.5">Registro</p>
-                <p className="text-sm text-white font-medium">{professional.registration_type}</p>
+                <p className="text-sm text-white font-medium">
+                  {professional.registration_type} {professional.registration_number}
+                </p>
               </div>
             </div>
 

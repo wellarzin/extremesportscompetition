@@ -43,6 +43,7 @@ export async function landingRoutes(app: FastifyInstance) {
                   photo_url: { type: "string", nullable: true },
                   education: { type: "string" },
                   registration_type: { type: "string" },
+                  registration_number: { type: "string" },
                   bio: { type: "string", nullable: true },
                   specialties: {
                     type: "array",
@@ -85,6 +86,7 @@ export async function landingRoutes(app: FastifyInstance) {
             photo_url: true,
             education: true,
             registration_type: true,
+            registration_number: true,
             bio: true,
             specialties: {
               select: { id: true, specialty: true, notes: true },

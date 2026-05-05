@@ -91,6 +91,7 @@ export interface LandingProfessional {
   photo_url: string | null;
   education: string;
   registration_type: string;
+  registration_number: string;
   bio: string | null;
   specialties: ProfessionalSpecialty[];
 }
