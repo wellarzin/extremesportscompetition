@@ -1,5 +1,11 @@
 /* AirLens Portfolio - Global Styles */
 
+/* Prevent horizontal scroll on mobile */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 /* Remove default root constraints */
 #root {
   width: 100%;

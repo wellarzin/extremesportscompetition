@@ -97,7 +97,7 @@ export const eventsConfig: EventsConfig = {
   subtitle: "COMPETIÇÕES",
   titleRegular: "Próximos",
   titleItalic: "Eventos",
-  description: "Participe dos eventos mais emocionantes para trabalhadores por aplicativo. Corrida, funcional, yoga e muito mais com premiações incríveis!",
+  description: "Participe dos eventos mais emocionantes para trabalhadores por aplicativo com premiações incríveis!",
   events: [
     {
       id: 1,

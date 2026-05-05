@@ -187,15 +187,16 @@ export function Hero() {
           >
             {bgImage ? (
               <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url(${bgImage})` }}
+                className="absolute inset-0 bg-cover bg-center md:bg-center"
+                style={{ backgroundImage: `url(${bgImage})`, backgroundPosition: 'center top' }}
               />
             ) : (
               /* Fallback quando evento não tem cover */
               <div className="absolute inset-0 bg-gradient-to-br from-[#0d1310] via-[#0A0A0A] to-[#0A0A0A]" />
             )}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent" />
+            {/* Mobile: gradiente mais forte cobrindo o fundo para o texto ficar legível */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/40 md:from-black/85 md:via-black/55 md:to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/30 to-transparent" />
           </div>
         );
       })}
@@ -247,8 +248,8 @@ export function Hero() {
       </nav>
 
       {/* Conteúdo do slide atual */}
-      <div className="relative z-10 min-h-screen flex items-center">
-        <div className="slide-content w-full px-4 md:px-8 lg:px-16 pt-20 pb-24 md:pt-24 md:pb-32">
+      <div className="relative z-10 min-h-screen flex items-end md:items-center">
+        <div className="slide-content w-full px-4 md:px-8 lg:px-16 pt-20 pb-28 md:pt-24 md:pb-32">
           {eventsLoading ? (
             /* Skeleton enquanto carrega */
             <div className="max-w-3xl space-y-5 animate-pulse">
