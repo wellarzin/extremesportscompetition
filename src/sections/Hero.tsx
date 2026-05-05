@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { heroConfig, companiesConfig } from '../config';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useAuthModal } from '../contexts/AuthModalContext';
+import { useNavigation, type AppPage } from '../contexts/NavigationContext';
 import { useFeaturedEvents } from '../hooks/useFeaturedEvents';
 import { mediaUrl } from '../lib/utils';
 import { UserMenu } from '../components/UserMenu';
@@ -83,6 +84,7 @@ export function Hero() {
 
   const { user, isRestoring } = useAuthContext();
   const { openAuthModal } = useAuthModal();
+  const { navigate } = useNavigation();
   const { events: featuredEvents, isLoading: eventsLoading } = useFeaturedEvents();
 
   // Monta lista de slides: eventos em destaque ou fallback estático
@@ -217,15 +219,25 @@ export function Hero() {
 
           {/* Nav links — visíveis apenas em desktop */}
           <div className="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
-            {heroConfig.navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="px-4 py-2 text-white/55 hover:text-white text-sm font-medium rounded-lg hover:bg-white/8 transition-all duration-200"
-              >
-                {link.label}
-              </a>
-            ))}
+            {heroConfig.navLinks.map((link) =>
+              link.href.startsWith('page:') ? (
+                <button
+                  key={link.label}
+                  onClick={() => navigate(link.href.slice(5) as AppPage)}
+                  className="px-4 py-2 text-white/55 hover:text-white text-sm font-medium rounded-lg hover:bg-white/8 transition-all duration-200"
+                >
+                  {link.label}
+                </button>
+              ) : (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className="px-4 py-2 text-white/55 hover:text-white text-sm font-medium rounded-lg hover:bg-white/8 transition-all duration-200"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -415,12 +427,22 @@ export function Hero() {
               </button>
             </div>
             <nav className="space-y-2">
-              {heroConfig.navLinks.map((link) => (
-                <a key={link.label} href={link.href} onClick={() => setMenuOpen(false)}
-                  className="block px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-all font-medium">
-                  {link.label}
-                </a>
-              ))}
+              {heroConfig.navLinks.map((link) =>
+                link.href.startsWith('page:') ? (
+                  <button
+                    key={link.label}
+                    onClick={() => { navigate(link.href.slice(5) as AppPage); setMenuOpen(false); }}
+                    className="w-full text-left block px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-all font-medium"
+                  >
+                    {link.label}
+                  </button>
+                ) : (
+                  <a key={link.label} href={link.href} onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-3 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-all font-medium">
+                    {link.label}
+                  </a>
+                )
+              )}
             </nav>
             {user && (
               <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">

@@ -64,7 +64,8 @@ export const heroConfig: HeroConfig = {
     { label: "Profissionais", href: "#atletas" },
     // { label: "Rankings", href: "#rankings" },
     // { label: "Loja", href: "#loja" },
-    { label: "Empresas", href: "#empresas" }
+    { label: "Empresas", href: "#empresas" },
+    { label: "Notícias", href: "page:news" }
   ],
   onlineUsers: 3428
 };

@@ -15,6 +15,7 @@ import { eventsRoutes } from "./routes/events";
 import { professionalsRoutes } from "./routes/professionals";
 import { landingRoutes } from "./routes/landing";
 import { checkoutRoutes } from "./routes/checkout";
+import { newsRoutes } from "./routes/news";
 import { devRoutes } from "./routes/dev";
 
 let redisClient: import("ioredis").Redis | undefined;
@@ -289,6 +290,7 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
   app.register(professionalsRoutes, { prefix: "/api/v1/professionals" });
   app.register(landingRoutes,       { prefix: "/api/v1/landing" });
   app.register(checkoutRoutes,      { prefix: "/api/v1/checkout" });
+  app.register(newsRoutes,          { prefix: "/api/v1/news" });
 
   if (env.NODE_ENV === "development") {
     app.register(devRoutes, { prefix: "/api/dev/simulate-payment" });

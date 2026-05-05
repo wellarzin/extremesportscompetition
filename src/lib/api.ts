@@ -15,6 +15,8 @@ import type {
   LandingEventDetail,
   FeaturedEvent,
   LandingProfessional,
+  LandingNewsArticle,
+  NewsCategory,
   AuthUser,
   RegisterInput,
   UserTicket,
@@ -483,6 +485,41 @@ export async function sendSponsorContact(
       method: 'POST',
       body: JSON.stringify({ ...data, contact_type: 'sponsor' }),
     },
+    false,
+  );
+  return res.data;
+}
+
+// ============================================================
+// Landing — Notícias (público, sem auth)
+// ============================================================
+
+export async function fetchLandingNews(params: {
+  page?: number;
+  per_page?: number;
+  category?: NewsCategory;
+}): Promise<{ data: LandingNewsArticle[]; meta: ApiMeta }> {
+  const qs = new URLSearchParams({
+    page: String(params.page ?? 1),
+    per_page: String(params.per_page ?? 12),
+    ...(params.category ? { category: params.category } : {}),
+  });
+
+  const res = await request<ApiResponse<LandingNewsArticle[]>>(
+    `/api/v1/landing/news?${qs.toString()}`,
+    { method: 'GET' },
+    false,
+  );
+
+  return { data: res.data, meta: res.meta! };
+}
+
+export async function fetchLandingNewsBySlug(
+  slug: string,
+): Promise<LandingNewsArticle> {
+  const res = await request<ApiResponse<LandingNewsArticle>>(
+    `/api/v1/landing/news/${encodeURIComponent(slug)}`,
+    { method: 'GET' },
     false,
   );
   return res.data;

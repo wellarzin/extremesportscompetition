@@ -213,6 +213,13 @@ enum ProfessionalSubscriptionStatus {
   past_due
 }
 
+enum NewsCategory {
+  atletas
+  eventos
+  patrocinio
+  plataforma
+}
+
 enum ProfessionalSpecialty {
   hipertrofia
   emagrecimento
@@ -537,6 +544,27 @@ model Professional {
   @@index([active])
   @@index([deleted_at])
   @@map("professionals")
+}
+
+model News {
+  id              String       @id @default(uuid()) @db.Uuid
+  slug            String       @unique @db.VarChar(255)
+  title           String       @db.VarChar(255)
+  excerpt         String       @db.VarChar(500)
+  body            String       @db.Text
+  category        NewsCategory
+  cover_image_url String?
+  published       Boolean      @default(false)
+  published_at    DateTime?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  deleted_at      DateTime?
+
+  @@index([published, published_at(sort: Desc)])
+  @@index([category])
+  @@index([slug])
+  @@index([deleted_at])
+  @@map("news")
 }
 
 model ProfessionalSpecialties {

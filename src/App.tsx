@@ -16,6 +16,7 @@ import { FAQ } from './sections/FAQ';
 import { Footer } from './sections/Footer';
 import { AllEventsPage } from './pages/AllEventsPage';
 import { AllProfessionalsPage } from './pages/AllProfessionalsPage';
+import { NewsPage } from './pages/NewsPage';
 import { PaymentReturnHandler } from './components/PaymentReturnHandler';
 
 function LandingPage() {
@@ -41,6 +42,7 @@ function AppContent() {
   const { page } = useNavigation();
   if (page === 'events') return <AllEventsPage />;
   if (page === 'professionals') return <AllProfessionalsPage />;
+  if (page === 'news') return <NewsPage />;
   return <LandingPage />;
 }
 

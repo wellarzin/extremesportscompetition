@@ -85,6 +85,22 @@ export interface ProfessionalSpecialty {
   notes: string | null;
 }
 
+// ---- News ----
+
+export type NewsCategory = 'atletas' | 'eventos' | 'patrocinio' | 'plataforma';
+
+export interface LandingNewsArticle {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  body: string;
+  category: NewsCategory;
+  cover_image_url: string | null;
+  published_at: string | null;
+  created_at: string;
+}
+
 export interface LandingProfessional {
   id: string;
   full_name: string;

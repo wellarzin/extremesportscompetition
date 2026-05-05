@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
-export type AppPage = 'landing' | 'events' | 'professionals';
+export type AppPage = 'landing' | 'events' | 'professionals' | 'news';
 
 interface NavigationContextValue {
   page: AppPage;

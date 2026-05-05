@@ -3,6 +3,8 @@ import { prisma } from "../lib/prisma";
 import { email } from "../lib/email";
 import { sendSuccess, sendError, Errors } from "../lib/response";
 import { errorSchema } from "../lib/swagger-schemas";
+import { ListNewsQuerySchema } from "../schemas/news.schema";
+import { listPublishedNews, getPublishedNewsBySlug } from "../controllers/news.controller";
 
 // ============================================================
 // Rotas públicas da Landing Page
@@ -568,5 +570,104 @@ export async function landingRoutes(app: FastifyInstance) {
         proposal_id: proposal.id,
       });
     },
+  });
+
+  // ----------------------------------------------------------
+  // GET /landing/news — Lista notícias publicadas
+  // ----------------------------------------------------------
+  app.get("/news", {
+    schema: {
+      tags: ["🏠 Landing Page"],
+      summary: "Lista notícias publicadas",
+      description: "Retorna notícias publicadas, ordenadas por data de publicação. Sem autenticação.",
+      security: [],
+      querystring: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["atletas", "eventos", "patrocinio", "plataforma"] },
+          page: { type: "integer", minimum: 1, default: 1 },
+          per_page: { type: "integer", minimum: 1, maximum: 100, default: 12 },
+        },
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string", format: "uuid" },
+                  slug: { type: "string" },
+                  title: { type: "string" },
+                  excerpt: { type: "string" },
+                  body: { type: "string" },
+                  category: { type: "string" },
+                  cover_image_url: { type: "string", nullable: true },
+                  published_at: { type: "string", format: "date-time", nullable: true },
+                  created_at: { type: "string", format: "date-time" },
+                },
+              },
+            },
+            meta: {
+              type: "object",
+              properties: {
+                page: { type: "integer" },
+                per_page: { type: "integer" },
+                total: { type: "integer" },
+                total_pages: { type: "integer" },
+              },
+            },
+          },
+        },
+      },
+    },
+    handler: async (request, reply) => {
+      const result = ListNewsQuerySchema.safeParse(request.query);
+      if (!result.success) return Errors.validation(reply, result.error.errors.map((e) => ({ field: e.path.join("."), message: e.message })));
+      request.query = result.data as any;
+      return listPublishedNews(request as any, reply);
+    },
+  });
+
+  // ----------------------------------------------------------
+  // GET /landing/news/:slug — Notícia por slug
+  // ----------------------------------------------------------
+  app.get("/news/:slug", {
+    schema: {
+      tags: ["🏠 Landing Page"],
+      summary: "Retorna uma notícia publicada pelo slug",
+      security: [],
+      params: {
+        type: "object",
+        properties: { slug: { type: "string" } },
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                slug: { type: "string" },
+                title: { type: "string" },
+                excerpt: { type: "string" },
+                body: { type: "string" },
+                category: { type: "string" },
+                cover_image_url: { type: "string", nullable: true },
+                published_at: { type: "string", format: "date-time", nullable: true },
+                created_at: { type: "string", format: "date-time" },
+              },
+            },
+          },
+        },
+        404: errorSchema("Notícia não encontrada"),
+      },
+    },
+    handler: getPublishedNewsBySlug as any,
   });
 }
