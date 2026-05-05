@@ -178,7 +178,7 @@ export function Companies() {
             <div className="p-6 bg-gradient-to-br from-[#4169E1]/15 to-[#4169E1]/5 rounded-2xl border border-[#4169E1]/20">
               <Mail className="w-7 h-7 text-[#4169E1] mb-3" />
               <h4 className="text-white font-semibold mb-1">Email Comercial</h4>
-              <p className="text-white/55 text-sm">extremesportscompetition@gmail.com</p>
+              <p className="text-white/55 text-sm">projetos@extremesportscompetition.com</p>
             </div>
           </div>
 

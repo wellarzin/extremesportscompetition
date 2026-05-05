@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  X, RefreshCw, Calendar, MapPin, Users, Trophy, Gift,
+  X, RefreshCw, Calendar, MapPin, Users, Gift,
   Copy, Check, ExternalLink, Clock, Lock, Ticket, AlertCircle,
   Zap, CreditCard,
 } from 'lucide-react';
@@ -517,7 +517,9 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
           </p>
           {detail?.capacity !== null && detail?.capacity !== undefined && (
             <p className="text-white/40 text-xs mt-2">
-              {detail.enrolled} / {detail.capacity} inscritos
+              {detail.capacity === 999
+                ? `${detail.enrolled} inscritos · vagas ilimitadas`
+                : `${detail.enrolled} / ${detail.capacity} inscritos`}
             </p>
           )}
         </div>
@@ -600,16 +602,6 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
                     </div>
                   </div>
 
-                  {detail.ranking_points !== null && detail.ranking_points > 0 && (
-                    <div className="p-4 bg-gradient-to-r from-[#4169E1]/10 to-[#FF6B00]/10 rounded-xl border border-white/5 flex items-center gap-3">
-                      <Trophy className="w-5 h-5 text-[#FF6B00] flex-shrink-0" />
-                      <p className="text-white/80 text-sm">
-                        Este evento concede{' '}
-                        <span className="font-bold text-[#FF6B00]">{detail.ranking_points} pontos</span>{' '}
-                        ao ranking.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Right: info + checkout */}

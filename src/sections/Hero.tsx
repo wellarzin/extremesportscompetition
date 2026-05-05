@@ -211,7 +211,7 @@ export function Hero() {
             >
               <Menu className="w-5 h-5 text-white" />
             </button>
-            <img src="/logo.png" alt="Extreme Sports" className="h-10 md:h-12 w-auto" />
+            <img src="/logo.png" alt="Extreme Sports" className="h-18 md:h-20 w-auto" />
           </div>
 
           {/* Nav links — visíveis apenas em desktop */}
@@ -408,7 +408,7 @@ export function Hero() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
           <div className="absolute left-0 top-0 bottom-0 w-80 bg-[#0A0A0A] border-r border-white/10 p-6">
             <div className="flex items-center justify-between mb-8">
-              <img src="/logo.png" alt="Logo" className="h-10" />
+              <img src="/logo.png" alt="Logo" className="h-14" />
               <button onClick={() => setMenuOpen(false)} aria-label="Fechar menu" className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors">
                 <X className="w-5 h-5 text-white" />
               </button>
