@@ -79,9 +79,9 @@ export function FAQ() {
   return (
     <section
       ref={sectionRef}
-      className="relative w-full py-24 md:py-32 bg-[#0A0A0A]"
+      className="relative w-full py-16 md:py-24 lg:py-32 bg-[#0A0A0A]"
     >
-      <div className="max-w-4xl mx-auto px-6 md:px-12">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-12">
         {/* Section Header */}
         <div ref={headerRef} className="text-center mb-16 md:mb-20 opacity-0">
           {faqConfig.subtitle && (

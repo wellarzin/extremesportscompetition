@@ -165,7 +165,7 @@ export function CreateEvents() {
     <section
       ref={sectionRef}
       id="crie-eventos"
-      className="relative py-24 md:py-32 bg-[#0d1310]"
+      className="relative py-16 md:py-24 lg:py-32 bg-[#0d1310]"
     >
       {/* Background accent */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A] via-[#0d1a10] to-[#0A0A0A]" />

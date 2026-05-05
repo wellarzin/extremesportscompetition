@@ -92,7 +92,7 @@ export function Stats() {
   return (
     <section
       ref={sectionRef}
-      className="relative py-24 md:py-32 bg-[#f4f4f4] overflow-hidden"
+      className="relative py-16 md:py-24 lg:py-32 bg-[#f4f4f4] overflow-hidden"
     >
       {/* Subtle ambient */}
       <div className="absolute inset-0 pointer-events-none">
@@ -101,12 +101,12 @@ export function Stats() {
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8">
         {/* Section Header — assimétrico */}
-        <div ref={titleRef} className="mb-16 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+        <div ref={titleRef} className="mb-10 md:mb-16 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#FF6B00]/10 border border-[#FF6B00]/20 text-[#FF6B00] text-xs font-semibold tracking-widest uppercase mb-5">
               {statsConfig.subtitle}
             </span>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-sans font-extrabold text-[#0A0A0A] tracking-tight leading-none">
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-sans font-extrabold text-[#0A0A0A] tracking-tight leading-none">
               {statsConfig.titleRegular}{' '}
               <span className="font-serif italic text-[#4169E1]">{statsConfig.titleItalic}</span>
             </h2>
@@ -120,17 +120,17 @@ export function Stats() {
         <div ref={statsRef} className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-5">
           {statsConfig.stats.map((stat, index) => (
             <div key={index} className="stat-card relative group">
-              <div className="relative p-6 md:p-8 bg-white rounded-2xl border border-black/5 hover:border-[#4169E1]/20 transition-all duration-500 overflow-hidden shadow-sm">
+              <div className="relative p-4 md:p-6 lg:p-8 bg-white rounded-2xl border border-black/5 hover:border-[#4169E1]/20 transition-all duration-500 overflow-hidden shadow-sm">
                 {/* Gradient on hover */}
                 <div className="absolute inset-0 bg-gradient-to-br from-[#4169E1]/5 via-transparent to-[#FF6B00]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                 <div className="relative z-10">
                   {/* Value */}
                   <div className="flex items-baseline gap-0.5 mb-2">
-                    <span className="text-5xl md:text-6xl font-extrabold text-[#0A0A0A] tracking-tight">
+                    <span className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-[#0A0A0A] tracking-tight">
                       {formatValue(animatedValues[index])}
                     </span>
-                    <span className="text-3xl md:text-4xl font-bold text-[#FF6B00]">
+                    <span className="text-2xl md:text-3xl lg:text-4xl font-bold text-[#FF6B00]">
                       {stat.suffix}
                     </span>
                   </div>

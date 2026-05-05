@@ -163,7 +163,7 @@ export function Athletes() {
     <section
       ref={sectionRef}
       id="atletas"
-      className="relative py-24 md:py-32 bg-[#0A0A0A]"
+      className="relative py-16 md:py-24 lg:py-32 bg-[#0A0A0A]"
     >
       {/* Ambient blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -179,7 +179,7 @@ export function Athletes() {
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#FF6B00]/10 border border-[#FF6B00]/20 text-[#FF6B00] text-xs font-semibold tracking-widest uppercase mb-5">
               {athletesConfig.subtitle}
             </span>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-sans font-extrabold text-white tracking-tight leading-none mb-4">
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-sans font-extrabold text-white tracking-tight leading-none mb-4">
               {athletesConfig.titleRegular}{' '}
               <span className="font-serif italic text-[#FF6B00]">{athletesConfig.titleItalic}</span>
             </h2>

@@ -87,7 +87,7 @@ export function Testimonials() {
   return (
     <section
       ref={sectionRef}
-      className="relative py-24 md:py-32 bg-[#0A0A0A] overflow-hidden"
+      className="relative py-16 md:py-24 lg:py-32 bg-[#0A0A0A] overflow-hidden"
     >
       {/* Ambient glow */}
       <div className="absolute inset-0 pointer-events-none">

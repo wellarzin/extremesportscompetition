@@ -141,7 +141,7 @@ export function Companies() {
 
   // ---- render ----
   return (
-    <section ref={sectionRef} id="empresas" className="relative py-24 md:py-32 bg-[#0A0A0A]">
+    <section ref={sectionRef} id="empresas" className="relative py-16 md:py-24 lg:py-32 bg-[#0A0A0A]">
       <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A] via-[#0F1219] to-[#0A0A0A]" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8">
@@ -218,7 +218,7 @@ export function Companies() {
           {/* Master */}
           <div className="relative group mb-6">
             <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-[#FF6B00]/0 via-[#FF6B00]/30 to-[#FF6B00]/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-sm" />
-            <div className="relative p-10 md:p-14 rounded-2xl bg-gradient-to-br from-[#1a0a00] via-[#110800] to-[#0A0A0A] border border-[#FF6B00]/25 overflow-hidden">
+            <div className="relative p-6 md:p-10 lg:p-14 rounded-2xl bg-gradient-to-br from-[#1a0a00] via-[#110800] to-[#0A0A0A] border border-[#FF6B00]/25 overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#FF6B00] to-transparent" />
               <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `repeating-linear-gradient(45deg, #FF6B00 0px, #FF6B00 1px, transparent 1px, transparent 20px)` }} />
               <div className="relative flex flex-col md:flex-row items-center justify-between gap-8">
@@ -228,7 +228,7 @@ export function Companies() {
                     <span className="text-[#FF6B00] text-xs font-bold tracking-[0.2em] uppercase">Patrocinador Master</span>
                   </div>
                   <div>
-                    <h3 className="text-5xl md:text-7xl font-sans font-extrabold tracking-tight leading-none"
+                    <h3 className="text-4xl sm:text-5xl md:text-7xl font-sans font-extrabold tracking-tight leading-none"
                       style={{ background: 'linear-gradient(135deg, #ffffff 40%, #FF6B00 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
                       {companiesConfig.sponsors.master.logoText}
                     </h3>

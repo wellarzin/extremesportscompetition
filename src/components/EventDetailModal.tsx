@@ -531,7 +531,7 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-auto bg-[#141414] border border-white/10 rounded-2xl">
+      <div className="relative w-full max-w-4xl max-h-[92vh] overflow-auto bg-[#141414] border border-white/10 rounded-2xl">
         <button
           onClick={onClose}
           aria-label="Fechar"
@@ -575,12 +575,12 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
                     {categoryLabel(detail.category)}
                   </span>
                 </div>
-                <h2 className="text-3xl md:text-4xl font-sans font-bold text-white">{detail.title}</h2>
+                <h2 className="text-xl sm:text-3xl md:text-4xl font-sans font-bold text-white">{detail.title}</h2>
               </div>
             </div>
 
-            <div className="p-6 md:p-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="p-4 sm:p-6 md:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                 {/* Left: event details */}
                 <div className="md:col-span-2 space-y-6">
                   <div>

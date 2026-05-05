@@ -211,7 +211,7 @@ export function Hero() {
             >
               <Menu className="w-5 h-5 text-white" />
             </button>
-            <img src="/logo.png" alt="Extreme Sports" className="h-18 md:h-20 w-auto" />
+            <img src="/logo.png" alt="Extreme Sports" className="h-16 md:h-20 w-auto" />
           </div>
 
           {/* Nav links — visíveis apenas em desktop */}
@@ -248,7 +248,7 @@ export function Hero() {
 
       {/* Conteúdo do slide atual */}
       <div className="relative z-10 min-h-screen flex items-center">
-        <div className="slide-content w-full px-4 md:px-8 lg:px-16 pt-24 pb-32">
+        <div className="slide-content w-full px-4 md:px-8 lg:px-16 pt-20 pb-24 md:pt-24 md:pb-32">
           {eventsLoading ? (
             /* Skeleton enquanto carrega */
             <div className="max-w-3xl space-y-5 animate-pulse">
@@ -270,7 +270,7 @@ export function Hero() {
                 </span>
               </div>
 
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-sans font-extrabold text-white tracking-tight leading-tight mb-4">
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-sans font-extrabold text-white tracking-tight leading-tight mb-4">
                 {currentDynamic.event.title}
               </h1>
 
@@ -330,7 +330,7 @@ export function Hero() {
                 <span className="w-2 h-2 rounded-full bg-[#FF6B00] animate-pulse" />
                 <span className="text-[#FF6B00] text-sm font-medium">Competicao Oficial</span>
               </div>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-sans font-extrabold text-white tracking-tight leading-tight mb-4">
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-sans font-extrabold text-white tracking-tight leading-tight mb-4">
                 {currentDynamic.title}
               </h1>
               <p className="text-lg md:text-xl text-white/80 font-body mb-8 max-w-xl">
@@ -350,7 +350,7 @@ export function Hero() {
       </div>
 
       {/* Master Sponsor badge */}
-      <div className="absolute bottom-10 left-4 md:left-8 z-20 hidden sm:flex items-center gap-3">
+      <div className="absolute bottom-10 left-4 md:left-8 z-20 flex items-center gap-3">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/40 backdrop-blur-sm border border-[#FF6B00]/20">
           <Crown className="w-3 h-3 text-[#FF6B00] flex-shrink-0" />
           <span className="text-white/35 text-[10px] font-medium tracking-widest uppercase">Master</span>
@@ -406,7 +406,7 @@ export function Hero() {
       {menuOpen && (
         <div className="fixed inset-0 z-[100]">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-80 bg-[#0A0A0A] border-r border-white/10 p-6">
+          <div className="absolute left-0 top-0 bottom-0 w-[85vw] max-w-xs sm:w-80 bg-[#0A0A0A] border-r border-white/10 p-6">
             <div className="flex items-center justify-between mb-8">
               <img src="/logo.png" alt="Logo" className="h-14" />
               <button onClick={() => setMenuOpen(false)} aria-label="Fechar menu" className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors">

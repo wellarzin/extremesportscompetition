@@ -107,7 +107,7 @@ export function Events() {
     <section
       ref={sectionRef}
       id="eventos"
-      className="relative py-24 md:py-32 bg-[#0A0A0A]"
+      className="relative py-16 md:py-24 lg:py-32 bg-[#0A0A0A]"
     >
       <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A] via-[#0F0F0F] to-[#0A0A0A]" />
 
@@ -119,7 +119,7 @@ export function Events() {
             <span className="inline-block px-4 py-2 rounded-full bg-[#00FF87]/10 border border-[#00FF87]/20 text-[#00FF87] text-sm font-medium mb-5">
               {eventsConfig.subtitle}
             </span>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-sans font-bold text-white tracking-tight mb-4">
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-sans font-bold text-white tracking-tight mb-4">
               {eventsConfig.titleRegular}{' '}
               <span className="font-serif italic text-[#FF6B00]">{eventsConfig.titleItalic}</span>
             </h2>

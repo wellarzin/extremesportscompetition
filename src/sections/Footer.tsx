@@ -48,8 +48,8 @@ export function Footer() {
       className="relative bg-[#0A0A0A] border-t border-white/5"
     >
       {/* Main Footer */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 md:py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
           {/* Logo & Description */}
           <div className="lg:col-span-1">
             <div ref={logoRef} className="mb-6">

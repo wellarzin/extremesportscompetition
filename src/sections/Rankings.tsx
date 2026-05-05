@@ -80,7 +80,7 @@ export function Rankings() {
     <section
       ref={sectionRef}
       id="rankings"
-      className="relative py-24 md:py-32 bg-[#0A0A0A]"
+      className="relative py-16 md:py-24 lg:py-32 bg-[#0A0A0A]"
     >
       <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A] via-[#0d0f14] to-[#0A0A0A]" />
 
