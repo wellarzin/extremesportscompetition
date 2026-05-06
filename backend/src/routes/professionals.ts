@@ -150,7 +150,7 @@ export async function professionalsRoutes(app: FastifyInstance) {
           type: "object",
           properties: {
             success: { type: "boolean" },
-            data: { anyOf: [{ type: "object", additionalProperties: true }, { type: "null" }] },
+            data: { type: "object", additionalProperties: true, nullable: true },
           },
         },
         401: errorSchema("Não autorizado"),

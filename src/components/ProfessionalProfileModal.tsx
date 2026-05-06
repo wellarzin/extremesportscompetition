@@ -31,15 +31,40 @@ export function ProfessionalProfileModal({ professional, index, onClose }: Profe
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
       <div className="relative w-full max-w-4xl max-h-[90vh] overflow-auto bg-[#111] border border-white/10 rounded-2xl">
         {/* Hero banner */}
-        <div className="relative h-56 md:h-72 overflow-hidden">
-          <img
-            src={mediaUrl(professional.photo_url) ?? PLACEHOLDER_AVATAR}
-            alt={professional.full_name}
-            className="w-full h-full object-cover object-top"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_AVATAR; }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-[#111]/50 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#111]/60 to-transparent" />
+        <div className="relative overflow-hidden">
+          {/* Blurred background */}
+          <div className="absolute inset-0">
+            <img
+              src={mediaUrl(professional.photo_url) ?? PLACEHOLDER_AVATAR}
+              alt=""
+              aria-hidden="true"
+              className="w-full h-full object-cover object-center scale-110"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_AVATAR; }}
+            />
+            <div className="absolute inset-0 backdrop-blur-2xl bg-black/60" />
+          </div>
+
+          <div className="relative flex flex-col md:flex-row items-center md:items-end gap-6 px-6 md:px-8 pt-12 pb-6">
+            {/* Full photo */}
+            <div className="flex-shrink-0 w-40 h-40 md:w-48 md:h-48 rounded-2xl overflow-hidden border-2 border-white/10 shadow-2xl bg-[#111]">
+              <img
+                src={mediaUrl(professional.photo_url) ?? PLACEHOLDER_AVATAR}
+                alt={professional.full_name}
+                className="w-full h-full object-contain object-center"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_AVATAR; }}
+              />
+            </div>
+
+            {/* Name + badge */}
+            <div className="pb-1 text-center md:text-left">
+              <span className="inline-block px-3 py-1 rounded bg-[#4169E1]/20 text-[#4169E1] text-xs font-semibold tracking-wide mb-3">
+                {professional.registration_type}
+              </span>
+              <h2 className="text-3xl md:text-4xl font-sans font-extrabold text-white leading-none">
+                {professional.full_name}
+              </h2>
+            </div>
+          </div>
 
           <button
             onClick={onClose}
@@ -48,15 +73,6 @@ export function ProfessionalProfileModal({ professional, index, onClose }: Profe
           >
             <X className="w-4 h-4 text-white" />
           </button>
-
-          <div className="absolute bottom-6 left-6 md:left-8">
-            <span className="inline-block px-3 py-1 rounded bg-[#4169E1]/20 text-[#4169E1] text-xs font-semibold tracking-wide mb-3">
-              {professional.registration_type}
-            </span>
-            <h2 className="text-3xl md:text-4xl font-sans font-extrabold text-white leading-none">
-              {professional.full_name}
-            </h2>
-          </div>
         </div>
 
         {/* Body */}
