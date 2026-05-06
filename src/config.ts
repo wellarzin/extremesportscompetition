@@ -570,11 +570,11 @@ export const statsConfig: StatsConfig = {
   titleRegular: "Nossa",
   titleItalic: "História",
   stats: [
-    { value: 50, suffix: "+", label: "Eventos Realizados" },
-    { value: 15000, suffix: "+", label: "Trabalhadores Atendidos" },
-    { value: 120, suffix: "", label: "Profissionais Credenciados" },
+    { value: 10, suffix: "+", label: "Eventos Realizados" },
+    { value: 800, suffix: "+", label: "Trabalhadores Atendidos" },
+    { value: 12, suffix: "+", label: "Profissionais Credenciados" },
     { value: 8, suffix: "", label: "Cidades Atendidas" },
-    { value: 500, suffix: "K+", label: "Em Premiações" },
+    { value: 30, suffix: "K+", label: "Em Premiações" },
     { value: 98, suffix: "%", label: "Satisfação dos Participantes" }
   ]
 };

@@ -73,3 +73,17 @@ export const UpdateSportPreferenceSchema = z
   .refine((d) => Object.keys(d).length > 0, { message: "Ao menos um campo deve ser fornecido." });
 
 export type UpdateSportPreferenceInput = z.infer<typeof UpdateSportPreferenceSchema>;
+
+export const ChangePasswordSchema = z
+  .object({
+    current_password: z.string().min(1, "Senha atual é obrigatória."),
+    new_password: z
+      .string()
+      .min(8, "Nova senha deve ter ao menos 8 caracteres.")
+      .max(72)
+      .regex(/[A-Z]/, "Nova senha deve conter ao menos uma letra maiúscula.")
+      .regex(/[0-9]/, "Nova senha deve conter ao menos um número."),
+  })
+  .strict();
+
+export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;

@@ -27,6 +27,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  updateUser: (updates: Partial<AuthUser>) => void;
 }
 
 // ============================================================
@@ -103,8 +104,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearError = useCallback(() => setError(null), []);
 
+  const updateUser = useCallback((updates: Partial<AuthUser>) => {
+    setUser(prev => prev ? { ...prev, ...updates } : null);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, isRestoring, error, login, logout, clearError }}>
+    <AuthContext.Provider value={{ user, isLoading, isRestoring, error, login, logout, clearError, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

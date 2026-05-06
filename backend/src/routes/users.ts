@@ -6,6 +6,7 @@ import {
   DeleteAccountSchema,
   AddSportPreferenceSchema,
   UpdateSportPreferenceSchema,
+  ChangePasswordSchema,
 } from "../schemas/users.schema";
 import * as usersController from "../controllers/users.controller";
 import { Errors } from "../lib/response";
@@ -175,6 +176,45 @@ export async function usersRoutes(app: FastifyInstance) {
       },
     },
     handler: usersController.uploadDeliveryProof,
+  });
+
+  // ----------------------------------------------------------
+  // PATCH /users/me/password
+  // ----------------------------------------------------------
+  app.patch("/me/password", {
+    ...AUTHENTICATED,
+    schema: {
+      tags: ["Users"],
+      summary: "Altera senha do usuário autenticado",
+      description: "Exige senha atual para confirmar. A nova senha deve ter ao menos 8 caracteres, 1 maiúscula e 1 número.",
+      body: {
+        type: "object",
+        required: ["current_password", "new_password"],
+        properties: {
+          current_password: { type: "string" },
+          new_password: { type: "string", minLength: 8, maxLength: 72 },
+        },
+      },
+      response: {
+        200: { description: "Senha alterada", type: "object", properties: { success: { type: "boolean" }, data: { type: "object", additionalProperties: true } } },
+        401: errorSchema("Senha atual incorreta"),
+        422: errorSchema("Erro de validação"),
+      },
+    },
+    preHandler: [
+      authenticate,
+      async (request, reply) => {
+        const result = ChangePasswordSchema.safeParse(request.body);
+        if (!result.success) {
+          return Errors.validation(
+            reply,
+            result.error.errors.map((e) => ({ field: e.path.join("."), message: e.message }))
+          );
+        }
+        request.body = result.data;
+      },
+    ],
+    handler: usersController.changePassword,
   });
 
   // ----------------------------------------------------------

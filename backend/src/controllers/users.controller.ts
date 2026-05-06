@@ -13,6 +13,7 @@ import type {
   DeleteAccountInput,
   AddSportPreferenceInput,
   UpdateSportPreferenceInput,
+  ChangePasswordInput,
 } from "../schemas/users.schema";
 
 const BCRYPT_ROUNDS = 12;
@@ -382,6 +383,36 @@ export async function deleteMe(
   return sendSuccess(reply, {
     message: "Solicitação de exclusão registrada. Sua conta será removida em 7 dias.",
   });
+}
+
+// ============================================================
+// PATCH /users/me/password
+// ============================================================
+
+export async function changePassword(
+  request: FastifyRequest<{ Body: ChangePasswordInput }>,
+  reply: FastifyReply
+) {
+  const userId = request.user.sub;
+  const { current_password, new_password } = request.body;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId, deleted_at: null },
+    select: { id: true, password_hash: true },
+  });
+
+  if (!user) return Errors.notFound(reply, "Usuário");
+
+  const match = await bcrypt.compare(current_password, user.password_hash);
+  if (!match) return Errors.unauthorized(reply);
+
+  const newHash = await bcrypt.hash(new_password, BCRYPT_ROUNDS);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password_hash: newHash },
+  });
+
+  return sendSuccess(reply, { message: "Senha alterada com sucesso." });
 }
 
 // ============================================================

@@ -5,7 +5,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3333';
+// Em desenvolvimento: VITE_API_URL vazio → URLs relativas → proxy Vite → localhost:3333
+// Em produção: VITE_API_URL com a URL completa do backend
+const API_BASE: string = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
 /**
  * Converte URLs relativas de mídia (ex: "/uploads/covers/img.jpg")

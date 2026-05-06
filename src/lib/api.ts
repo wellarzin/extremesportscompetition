@@ -29,7 +29,9 @@ import type {
 
 export type { RegisterInput };
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:3333';
+// Em desenvolvimento: VITE_API_URL vazio → URLs relativas → proxy Vite → localhost:3333
+// Em produção: VITE_API_URL com a URL completa do backend
+const BASE_URL: string = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
 // Token em memória — não persiste entre recarregamentos (design intencional)
 let _accessToken: string | null = null;
@@ -420,6 +422,53 @@ export async function getMyProfessionalSubscriptionStatus(): Promise<Professiona
   const res = await request<ApiResponse<ProfessionalSubscriptionStatusResponse | null>>(
     '/api/v1/professionals/subscribe/status',
     { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function uploadAvatar(file: File): Promise<{ photo_url: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const headers: Record<string, string> = {};
+  if (_accessToken) headers['Authorization'] = `Bearer ${_accessToken}`;
+
+  const res = await fetch(`${BASE_URL}/api/v1/users/me/avatar`, {
+    method: 'POST',
+    headers,
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const message: string = (body as { message?: string } | null)?.message ?? 'Erro ao enviar foto.';
+    throw new ApiError(res.status, message);
+  }
+
+  const data = await res.json() as ApiResponse<{ photo_url: string }>;
+  return data.data;
+}
+
+export async function updateProfile(data: { full_name?: string }): Promise<{ full_name: string; photo_url: string | null }> {
+  const res = await request<ApiResponse<{ full_name: string; photo_url: string | null }>>(
+    '/api/v1/users/me',
+    { method: 'PUT', body: JSON.stringify(data) },
+  );
+  return { full_name: res.data.full_name, photo_url: res.data.photo_url };
+}
+
+export async function changePassword(current_password: string, new_password: string): Promise<void> {
+  await request('/api/v1/users/me/password', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_password, new_password }),
+  });
+}
+
+export async function changeEmail(new_email: string, password: string): Promise<{ message: string }> {
+  const res = await request<ApiResponse<{ message: string }>>(
+    '/api/v1/users/me/change-email',
+    { method: 'POST', body: JSON.stringify({ new_email, password }) },
   );
   return res.data;
 }

@@ -72,18 +72,28 @@ async function createRefreshToken(
   return { rawToken, tokenFamily };
 }
 
+// Em produção, frontend e backend estão em domínios diferentes (cross-site).
+// SameSite=None + Secure é obrigatório para que o browser envie o cookie
+// em requisições cross-site com credentials: 'include'.
+// Em desenvolvimento, o proxy Vite torna tudo same-origin → SameSite=Lax basta.
+const IS_PROD = process.env.NODE_ENV === "production";
+
 function setRefreshCookie(reply: FastifyReply, rawToken: string): void {
   reply.setCookie("refresh_token", rawToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: IS_PROD,
+    sameSite: IS_PROD ? "none" : "lax",
     path: "/api/v1/auth",
     maxAge: REFRESH_TOKEN_EXPIRES_MS / 1000,
   });
 }
 
 function clearRefreshCookie(reply: FastifyReply): void {
-  reply.clearCookie("refresh_token", { path: "/api/v1/auth" });
+  reply.clearCookie("refresh_token", {
+    path: "/api/v1/auth",
+    secure: IS_PROD,
+    sameSite: IS_PROD ? "none" : "lax",
+  });
 }
 
 // ============================================================
