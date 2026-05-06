@@ -190,13 +190,8 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
 </html>`);
   });
 
-  app.get("/api/docs/json", { schema: { hide: true } }, async (req, reply) => {
-    try {
-      reply.send(app.swagger());
-    } catch (err) {
-      req.log.error({ err, stack: err instanceof Error ? err.stack : undefined }, "SWAGGER_GEN_ERROR");
-      reply.code(500).send({ error: "swagger generation failed", message: String(err), stack: err instanceof Error ? err.stack : undefined });
-    }
+  app.get("/api/docs/json", { schema: { hide: true } }, async (_req, reply) => {
+    reply.send(app.swagger());
   });
 
   // ---- Segurança via Helmet ----

@@ -17,7 +17,7 @@ export async function newsRoutes(app: FastifyInstance) {
     schema: {
       tags: ["📰 Notícias (Admin)"],
       summary: "Lista todas as notícias (admin)",
-      security: [{ bearerAuth: [] }],
+      security: [{ BearerAuth: [] }],
       querystring: {
         type: "object",
         properties: {
@@ -48,7 +48,7 @@ export async function newsRoutes(app: FastifyInstance) {
     schema: {
       tags: ["📰 Notícias (Admin)"],
       summary: "Cria uma notícia",
-      security: [{ bearerAuth: [] }],
+      security: [{ BearerAuth: [] }],
       body: {
         type: "object",
         required: ["title", "excerpt", "body", "category"],
@@ -86,7 +86,7 @@ export async function newsRoutes(app: FastifyInstance) {
     schema: {
       tags: ["📰 Notícias (Admin)"],
       summary: "Atualiza uma notícia",
-      security: [{ bearerAuth: [] }],
+      security: [{ BearerAuth: [] }],
       params: { type: "object", properties: { id: { type: "string", format: "uuid" } } },
       response: {
         400: errorSchema("Dados inválidos"),
@@ -111,7 +111,7 @@ export async function newsRoutes(app: FastifyInstance) {
     schema: {
       tags: ["📰 Notícias (Admin)"],
       summary: "Remove uma notícia (soft delete)",
-      security: [{ bearerAuth: [] }],
+      security: [{ BearerAuth: [] }],
       params: { type: "object", properties: { id: { type: "string", format: "uuid" } } },
       response: {
         401: errorSchema("Não autorizado"),
