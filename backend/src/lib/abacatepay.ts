@@ -91,7 +91,11 @@ export async function createPixCharge(
       },
     },
   );
-  return normalizePixCharge(raw);
+  // DEBUG — remover após diagnóstico
+  console.log("[AbacatePay] createPixCharge raw response:", JSON.stringify(raw, null, 2));
+  const normalized = normalizePixCharge(raw);
+  console.log("[AbacatePay] normalized:", JSON.stringify(normalized, null, 2));
+  return normalized;
 }
 
 export async function getPixChargeStatus(

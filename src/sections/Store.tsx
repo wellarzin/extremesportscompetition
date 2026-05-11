@@ -27,7 +27,7 @@ interface CartItem {
 
 type CheckoutStep =
   | { type: 'method' }
-  | { type: 'pix'; orderId: string; pixCode: string; expiresAt: string }
+  | { type: 'pix'; orderId: string; pixCode: string; pixQrCode: string | null; expiresAt: string }
   | { type: 'card_redirect'; checkoutUrl: string }
   | { type: 'polling'; orderId: string; method: 'pix' | 'credit_card' }
   | { type: 'success' }
@@ -129,8 +129,12 @@ export function Store() {
   }, [products]);
 
   // ---- Polling de status ----
+  // Para PIX: poll em background sem sobrescrever a tela (usuário precisa ver o código)
+  // Para cartão: vai para step 'polling' (usuário já foi redirecionado)
   const startPolling = useCallback((orderId: string, method: 'pix' | 'credit_card') => {
-    setCheckoutStep({ type: 'polling', orderId, method });
+    if (method === 'credit_card') {
+      setCheckoutStep({ type: 'polling', orderId, method });
+    }
 
     pollingRef.current = setInterval(async () => {
       try {
@@ -210,6 +214,7 @@ export function Store() {
             type: 'pix',
             orderId: session.order_id,
             pixCode: session.pix_code,
+            pixQrCode: session.pix_qr_code ?? null,
             expiresAt: session.expires_at,
           });
           startPolling(session.order_id, 'pix');
@@ -603,15 +608,29 @@ export function Store() {
             {/* PIX QR Code */}
             {checkoutStep.type === 'pix' && (
               <>
-                <div className="text-center mb-6">
-                  <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#00FF87]/10 flex items-center justify-center">
-                    <QrCode className="w-7 h-7 text-[#00FF87]" />
-                  </div>
+                <div className="text-center mb-5">
                   <h2 className="text-xl font-bold text-white mb-1">Pague via PIX</h2>
-                  <p className="text-white/50 text-sm">{formatPrice(cartTotal)}</p>
+                  <p className="text-[#00FF87] font-semibold">{formatPrice(cartTotal)}</p>
                 </div>
 
-                <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6">
+                {/* QR Code image */}
+                {checkoutStep.pixQrCode && (
+                  <div className="flex justify-center mb-5">
+                    <div className="p-3 bg-white rounded-xl">
+                      <img
+                        src={
+                          checkoutStep.pixQrCode.startsWith('data:')
+                            ? checkoutStep.pixQrCode
+                            : `data:image/png;base64,${checkoutStep.pixQrCode}`
+                        }
+                        alt="QR Code PIX"
+                        className="w-48 h-48"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-5">
                   <p className="text-white/50 text-xs mb-2 uppercase tracking-wider">Código PIX Copia e Cola</p>
                   <p className="text-white/80 text-xs font-mono break-all leading-relaxed select-all">
                     {checkoutStep.pixCode}
