@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { storeConfig } from '../config';
+import { mediaUrl } from '../lib/utils';
 import {
   ShoppingCart, X, Plus, Minus, QrCode, CreditCard,
   Loader2, CheckCircle2, AlertCircle, Package, RefreshCw, Copy, Check,
@@ -332,7 +333,7 @@ export function Store() {
                   <div className="relative aspect-square overflow-hidden bg-[#1a1a1a]">
                     {product.image_url ? (
                       <img
-                        src={product.image_url}
+                        src={mediaUrl(product.image_url)!}
                         alt={product.name}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
@@ -458,7 +459,7 @@ export function Store() {
                       <div className="w-20 h-20 rounded-lg overflow-hidden bg-[#1a1a1a] shrink-0">
                         {item.product.image_url ? (
                           <img
-                            src={item.product.image_url}
+                            src={mediaUrl(item.product.image_url)!}
                             alt={item.product.name}
                             className="w-full h-full object-cover"
                           />

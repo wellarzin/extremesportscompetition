@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { X, Plus, Minus, ShoppingCart, Package, Tag, Layers } from 'lucide-react';
 import type { StoreProduct } from '../types/api';
+import { mediaUrl } from '../lib/utils';
 
 interface Props {
   product: StoreProduct;
@@ -59,7 +60,7 @@ export function ProductModal({ product, cartQuantity, onClose, onAdd, onRemove }
           <div className="relative md:w-64 md:flex-shrink-0 aspect-square md:aspect-auto bg-[#1a1a1a]">
             {product.image_url ? (
               <img
-                src={product.image_url}
+                src={mediaUrl(product.image_url)!}
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
