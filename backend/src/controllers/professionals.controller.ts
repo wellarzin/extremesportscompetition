@@ -32,10 +32,38 @@ function detectMime(buf: Buffer): string | null {
   return null;
 }
 
-// Preço mensal da assinatura profissional: R$ 49,90
-const PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS = 4990;
-// externalId fixo do produto no AbacatePay (evita criar produtos duplicados)
-const PROFESSIONAL_SUBSCRIPTION_PRODUCT_EXTERNAL_ID = "professional_subscription_monthly_v1";
+// Planos disponíveis de assinatura profissional
+// Todos usam ciclo MONTHLY — o AbacatePay cobra mensalmente o valor abaixo.
+// Semestral = R$81,69/mês × 6 = R$490,14 total (5% off)
+// Anual     = R$77,39/mês × 12 = R$928,68 total (~10% off)
+const PLANS = {
+  mensal: {
+    amountCents: 8599,             // R$85,99/mês
+    abacateCycle: "MONTHLY" as const,
+    externalId: "professional_plan_mensal_v1",
+    name: "Assinatura Profissional — Mensal",
+  },
+  trimestral: {
+    amountCents: 8599,             // R$85,99/mês (mesma taxa, compromisso 3 meses)
+    abacateCycle: "MONTHLY" as const,
+    externalId: "professional_plan_trimestral_v1",
+    name: "Assinatura Profissional — Trimestral",
+  },
+  semestral: {
+    amountCents: 8169,             // R$81,69/mês → R$490,14 em 6 meses
+    abacateCycle: "MONTHLY" as const,
+    externalId: "professional_plan_semestral_v2",
+    name: "Assinatura Profissional — Semestral",
+  },
+  anual: {
+    amountCents: 7739,             // R$77,39/mês → R$928,68 em 12 meses
+    abacateCycle: "MONTHLY" as const,
+    externalId: "professional_plan_anual_v2",
+    name: "Assinatura Profissional — Anual",
+  },
+} as const;
+
+type PlanType = keyof typeof PLANS;
 
 // ============================================================
 // POST /professionals/subscribe — qualquer usuário autenticado
@@ -57,10 +85,13 @@ export async function subscribeProfessional(
   const userId = request.user.sub;
   const body = request.body;
 
+  const planKey = (body.plan_type ?? "mensal") as PlanType;
+  const plan = PLANS[planKey] ?? PLANS.mensal;
+
   // ---- 1. Verifica assinatura existente ----
   const existing = await prisma.professionalSubscription.findUnique({
     where: { user_id: userId },
-    select: { id: true, status: true, checkout_url: true, billing_id: true, registration_number: true },
+    select: { id: true, status: true, checkout_url: true, billing_id: true, registration_number: true, amount_cents: true, plan_type: true },
   });
 
   if (existing) {
@@ -68,14 +99,23 @@ export async function subscribeProfessional(
       return Errors.conflict(reply, "Você já possui uma assinatura profissional ativa.");
     }
     if (existing.status === "pending_payment" && existing.checkout_url) {
-      // Retorna URL de checkout existente para o usuário continuar o pagamento
-      return sendSuccess(reply, {
-        subscription_id: existing.id,
-        checkout_url: existing.checkout_url,
-        amount_cents: PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
-        status: "pending_payment",
-        resumed: true,
-      }, 200);
+      // Retorna o checkout existente APENAS se o plano e o valor forem os mesmos.
+      // Isso evita que assinaturas legadas (price antigo) ou troca de plano retornem checkout errado.
+      const samePlan = existing.plan_type === planKey && existing.amount_cents === plan.amountCents;
+      if (samePlan) {
+        return sendSuccess(reply, {
+          subscription_id: existing.id,
+          checkout_url: existing.checkout_url,
+          amount_cents: existing.amount_cents,
+          status: "pending_payment",
+          resumed: true,
+        }, 200);
+      }
+      // Plano diferente — limpa dados do checkout antigo para prosseguir com o novo
+      await prisma.professionalSubscription.update({
+        where: { id: existing.id },
+        data: { billing_id: null, checkout_url: null, plan_type: planKey, amount_cents: plan.amountCents },
+      });
     }
   }
 
@@ -114,7 +154,8 @@ export async function subscribeProfessional(
         bio: body.bio ?? null,
         billing_id: null,
         checkout_url: null,
-        amount_cents: PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
+        plan_type: planKey,
+        amount_cents: plan.amountCents,
         status: "pending_payment",
         specialties: {
           deleteMany: {},
@@ -133,7 +174,8 @@ export async function subscribeProfessional(
         registration_number: body.registration_number,
         registration_type: body.registration_type,
         bio: body.bio ?? null,
-        amount_cents: PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
+        plan_type: planKey,
+        amount_cents: plan.amountCents,
         status: "pending_payment",
         specialties: {
           create: body.specialties.map((s) => ({ specialty: s.specialty, notes: s.notes })),
@@ -149,10 +191,10 @@ export async function subscribeProfessional(
     productId = await abacatepay.findOrCreateSubscriptionProduct(
       env.ABACATEPAY_API_KEY,
       env.ABACATEPAY_BASE_URL,
-      PROFESSIONAL_SUBSCRIPTION_PRODUCT_EXTERNAL_ID,
-      "Assinatura Profissional — Mensal",
-      PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
-      "MONTHLY",
+      plan.externalId,
+      plan.name,
+      plan.amountCents,
+      plan.abacateCycle,
     );
   } catch (err) {
     await prisma.professionalSubscription.delete({ where: { id: subscription.id } }).catch(() => {});
@@ -191,7 +233,7 @@ export async function subscribeProfessional(
   return sendSuccess(reply, {
     subscription_id: subscription.id,
     checkout_url: checkout.url,
-    amount_cents: PROFESSIONAL_SUBSCRIPTION_PRICE_CENTS,
+    amount_cents: plan.amountCents,
     status: "pending_payment",
   }, 201);
 }

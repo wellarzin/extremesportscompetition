@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, RefreshCw, Calendar, MapPin, Users, Gift,
   Copy, Check, ExternalLink, Clock, Lock, Ticket, AlertCircle,
-  Zap, CreditCard,
+  Zap, CreditCard, FileDown,
 } from 'lucide-react';
 import { fetchLandingEventDetail, enrollFreeEvent, initiateCheckout, getPaymentStatus, devSimulateCardCheckout, ApiError } from '../lib/api';
 import type { PaymentMethod } from '../lib/api';
@@ -587,10 +587,24 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
                     <h3 className="text-lg font-semibold text-white mb-3">Sobre o Evento</h3>
                     <p className="text-white/70 leading-relaxed">{detail.description}</p>
                   </div>
-                  {detail.rules && (
+                  {(detail.rules || detail.rules_file_url) && (
                     <div>
                       <h3 className="text-lg font-semibold text-white mb-3">Regras</h3>
-                      <p className="text-white/70 leading-relaxed">{detail.rules}</p>
+                      {detail.rules && (
+                        <p className="text-white/70 leading-relaxed mb-3">{detail.rules}</p>
+                      )}
+                      {detail.rules_file_url && (
+                        <a
+                          href={detail.rules_file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-[#00FF87]/10 hover:bg-[#00FF87]/20 border border-[#00FF87]/20 rounded-lg text-[#00FF87] text-sm font-medium transition-colors"
+                        >
+                          <FileDown className="w-4 h-4" />
+                          Baixar Regulamento (PDF)
+                        </a>
+                      )}
                     </div>
                   )}
                   {/* Recompensa */}

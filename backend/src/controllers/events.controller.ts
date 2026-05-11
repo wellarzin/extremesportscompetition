@@ -12,11 +12,13 @@ import type {
 } from "../schemas/events.schema";
 
 const COVERS_DIR = join(process.cwd(), "uploads", "covers");
+const RULES_PDF_DIR = join(process.cwd(), "uploads", "rules");
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
   "image/webp": ".webp",
 };
+const PDF_LIMIT = 10 * 1024 * 1024; // 10 MB para PDFs
 
 function detectMime(buf: Buffer): string | null {
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
@@ -546,4 +548,83 @@ export async function getOrganizedEvents(
     total,
     total_pages: Math.ceil(total / perPage),
   });
+}
+
+// ============================================================
+// POST /events/:id/rules-pdf — upload do PDF de regulamento
+// Apenas organizer do evento ou admin
+// ============================================================
+
+export async function uploadEventRulesPdf(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply,
+) {
+  const userId = request.user.sub;
+  const role = request.user.role;
+  const { id } = request.params;
+
+  const event = await prisma.event.findUnique({
+    where: { id, deleted_at: null },
+    select: { organizer_id: true },
+  });
+
+  if (!event) return Errors.notFound(reply, "Evento");
+  if (role !== "admin" && event.organizer_id !== userId) return Errors.forbidden(reply);
+
+  const data = await (request as any).file({ limits: { fileSize: PDF_LIMIT } });
+
+  if (!data) {
+    return Errors.validation(reply, [{ field: "file", message: "Arquivo não encontrado na requisição." }]);
+  }
+
+  const chunks: Buffer[] = [];
+  let totalSize = 0;
+
+  for await (const chunk of data.file) {
+    chunks.push(chunk as Buffer);
+    totalSize += (chunk as Buffer).length;
+    if (totalSize > PDF_LIMIT) {
+      return Errors.validation(reply, [{ field: "file", message: "Arquivo excede 10 MB." }]);
+    }
+  }
+
+  const fullBuffer = Buffer.concat(chunks);
+
+  // Valida magic bytes do PDF: %PDF
+  if (
+    fullBuffer.length < 4 ||
+    fullBuffer[0] !== 0x25 || // %
+    fullBuffer[1] !== 0x50 || // P
+    fullBuffer[2] !== 0x44 || // D
+    fullBuffer[3] !== 0x46    // F
+  ) {
+    return Errors.validation(reply, [{ field: "file", message: "O arquivo não é um PDF válido." }]);
+  }
+
+  const filename = `${randomUUID()}.pdf`;
+
+  try {
+    mkdirSync(RULES_PDF_DIR, { recursive: true });
+  } catch {
+    return Errors.internal(reply);
+  }
+
+  const filePath = join(RULES_PDF_DIR, filename);
+  const ws = createWriteStream(filePath);
+  ws.write(fullBuffer);
+  ws.end();
+
+  await new Promise<void>((resolve, reject) => {
+    ws.on("finish", resolve);
+    ws.on("error", reject);
+  });
+
+  const rules_file_url = `/uploads/rules/${filename}`;
+
+  await prisma.event.update({
+    where: { id },
+    data: { rules_file_url },
+  });
+
+  return sendSuccess(reply, { rules_file_url });
 }

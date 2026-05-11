@@ -3,14 +3,16 @@ import {
   X, Ticket, Calendar, MapPin, Tag, Loader2, Inbox,
   Upload, CheckCircle, AlertCircle, FileImage, ExternalLink,
   Camera, User, Mail, Lock, Eye, EyeOff, ChevronDown, ChevronUp, Check,
+  ShoppingBag, Package,
 } from 'lucide-react';
 import {
   fetchMyTickets, fetchMe, uploadDeliveryProof,
   uploadAvatar, updateProfile, changePassword, changeEmail,
+  fetchMyStoreOrders,
 } from '../lib/api';
 import { mediaUrl } from '../lib/utils';
 import { useAuthContext } from '../contexts/AuthContext';
-import type { UserTicket, ApiMeta, AuthUser } from '../types/api';
+import type { UserTicket, ApiMeta, AuthUser, StoreOrder } from '../types/api';
 
 // ---- helpers ----
 
@@ -655,6 +657,134 @@ function HistoryTab({ tickets, meta, isLoading, page, onLoadMore }: HistoryTabPr
   );
 }
 
+// ---- OrdersTab ----
+
+const ORDER_STATUS_CONFIG: Record<string, { label: string; classes: string }> = {
+  pending_payment: { label: 'Aguardando',  classes: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
+  paid:            { label: 'Pago',        classes: 'bg-[#00FF87]/10 text-[#00FF87] border-[#00FF87]/20' },
+  cancelled:       { label: 'Cancelado',   classes: 'bg-red-500/10 text-red-400 border-red-500/20' },
+  refunded:        { label: 'Reembolsado', classes: 'bg-white/8 text-white/40 border-white/10' },
+};
+
+const METHOD_LABEL: Record<string, string> = {
+  pix:         'PIX',
+  credit_card: 'Cartão',
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  vestuario: 'Vestuário', acessorios: 'Acessórios',
+  equipamentos: 'Equipamentos', nutricao: 'Nutrição', outros: 'Outros',
+};
+
+interface OrdersTabProps {
+  orders: StoreOrder[];
+  meta: ApiMeta | null;
+  isLoading: boolean;
+  page: number;
+  onLoadMore: (p: number) => void;
+}
+
+function OrdersTab({ orders, meta, isLoading, page, onLoadMore }: OrdersTabProps) {
+  const hasMore = meta ? page < meta.total_pages : false;
+
+  return (
+    <div className="p-7">
+      {meta && (
+        <div className="flex items-center gap-2 mb-5">
+          <ShoppingBag className="w-4 h-4 text-[#00FF87]" />
+          <span className="text-sm font-semibold text-white/70">Minhas Compras</span>
+          <span className="ml-auto text-xs text-white/30">
+            {meta.total} {meta.total === 1 ? 'pedido' : 'pedidos'}
+          </span>
+        </div>
+      )}
+
+      {isLoading && orders.length === 0 ? (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-28 rounded-xl bg-white/5 animate-pulse" />
+          ))}
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+            <Inbox className="w-8 h-8 text-white/20" />
+          </div>
+          <p className="text-white/50 font-medium mb-1">Nenhuma compra ainda</p>
+          <p className="text-white/25 text-sm">Explore a loja e encontre produtos exclusivos!</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {orders.map(order => {
+            const status = ORDER_STATUS_CONFIG[order.status] ?? ORDER_STATUS_CONFIG.cancelled;
+            return (
+              <div
+                key={order.id}
+                className="p-4 rounded-xl bg-white/4 border border-white/8 hover:border-white/14 transition-colors"
+              >
+                {/* Header do pedido */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${status.classes}`}>
+                      {status.label}
+                    </span>
+                    <span className="text-xs text-white/30">
+                      {METHOD_LABEL[order.method] ?? order.method}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white font-bold text-sm">{formatPrice(order.total_cents)}</p>
+                    <p className="text-white/30 text-[10px]">{formatDate(order.created_at)}</p>
+                  </div>
+                </div>
+
+                {/* Itens */}
+                <div className="space-y-2">
+                  {order.items.map(item => (
+                    <div key={item.id} className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-white/5 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                        {item.product.image_url ? (
+                          <img
+                            src={item.product.image_url.startsWith('/') ? `${window.location.origin.replace(':5173', ':3333')}${item.product.image_url}` : item.product.image_url}
+                            alt={item.product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Package className="w-4 h-4 text-white/15" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white/80 text-xs font-medium truncate">{item.product.name}</p>
+                        <p className="text-white/30 text-[10px]">
+                          {CATEGORY_LABEL[item.product.category] ?? item.product.category} · {item.quantity}x · {formatPrice(item.unit_price_cents)}
+                        </p>
+                      </div>
+                      <p className="text-white/60 text-xs font-semibold flex-shrink-0">
+                        {formatPrice(item.unit_price_cents * item.quantity)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {hasMore && (
+            <button
+              onClick={() => onLoadMore(page + 1)}
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl border border-white/10 text-white/50 hover:text-white hover:border-white/20 text-sm font-medium transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {isLoading ? 'Carregando...' : 'Carregar mais'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---- ProfileModal ----
 
 interface ProfileModalProps {
@@ -664,25 +794,37 @@ interface ProfileModalProps {
 
 export function ProfileModal({ open, onClose }: ProfileModalProps) {
   const { user } = useAuthContext();
-  const [activeTab, setActiveTab] = useState<'profile' | 'history'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'history' | 'orders'>('profile');
   const [deliveryProofUrl, setDeliveryProofUrl] = useState<string | null>(null);
+
+  // tickets
   const [tickets, setTickets] = useState<UserTicket[]>([]);
-  const [meta, setMeta] = useState<ApiMeta | null>(null);
+  const [ticketsMeta, setTicketsMeta] = useState<ApiMeta | null>(null);
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [ticketsPage, setTicketsPage] = useState(1);
+
+  // store orders
+  const [orders, setOrders] = useState<StoreOrder[]>([]);
+  const [ordersMeta, setOrdersMeta] = useState<ApiMeta | null>(null);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersPage, setOrdersPage] = useState(1);
 
   useEffect(() => {
     if (!open) {
       setActiveTab('profile');
       setDeliveryProofUrl(null);
       setTickets([]);
-      setMeta(null);
+      setTicketsMeta(null);
       setTicketsPage(1);
+      setOrders([]);
+      setOrdersMeta(null);
+      setOrdersPage(1);
       return;
     }
 
     fetchMe().then((me) => setDeliveryProofUrl(me.delivery_proof_url)).catch(() => {});
     loadTickets(1);
+    loadOrders(1);
   }, [open]);
 
   async function loadTickets(p: number) {
@@ -690,12 +832,26 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
     try {
       const res = await fetchMyTickets(p, 12);
       setTickets(prev => p === 1 ? res.data : [...prev, ...res.data]);
-      setMeta(res.meta);
+      setTicketsMeta(res.meta);
       setTicketsPage(p);
     } catch {
       // silencia
     } finally {
       setTicketsLoading(false);
+    }
+  }
+
+  async function loadOrders(p: number) {
+    setOrdersLoading(true);
+    try {
+      const res = await fetchMyStoreOrders(p, 10);
+      setOrders(prev => p === 1 ? res.data : [...prev, ...res.data]);
+      setOrdersMeta(res.meta);
+      setOrdersPage(p);
+    } catch {
+      // silencia
+    } finally {
+      setOrdersLoading(false);
     }
   }
 
@@ -758,9 +914,25 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
           >
             <Ticket className="w-3.5 h-3.5" />
             Histórico
-            {meta && meta.total > 0 && (
+            {ticketsMeta && ticketsMeta.total > 0 && (
               <span className="bg-[#FF6B00]/15 text-[#FF6B00] text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                {meta.total}
+                {ticketsMeta.total}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-medium transition-all ${
+              activeTab === 'orders'
+                ? 'text-[#00FF87] border-b-2 border-[#00FF87] -mb-px'
+                : 'text-white/35 hover:text-white/60'
+            }`}
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            Compras
+            {ordersMeta && ordersMeta.total > 0 && (
+              <span className="bg-[#00FF87]/15 text-[#00FF87] text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                {ordersMeta.total}
               </span>
             )}
           </button>
@@ -778,10 +950,19 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
           {activeTab === 'history' && (
             <HistoryTab
               tickets={tickets}
-              meta={meta}
+              meta={ticketsMeta}
               isLoading={ticketsLoading}
               page={ticketsPage}
               onLoadMore={loadTickets}
+            />
+          )}
+          {activeTab === 'orders' && (
+            <OrdersTab
+              orders={orders}
+              meta={ordersMeta}
+              isLoading={ordersLoading}
+              page={ordersPage}
+              onLoadMore={loadOrders}
             />
           )}
         </div>

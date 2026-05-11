@@ -220,6 +220,21 @@ enum NewsCategory {
   plataforma
 }
 
+enum ProductCategory {
+  vestuario
+  acessorios
+  equipamentos
+  nutricao
+  outros
+}
+
+enum StoreOrderStatus {
+  pending_payment
+  paid
+  cancelled
+  refunded
+}
+
 enum ProfessionalSpecialty {
   hipertrofia
   emagrecimento
@@ -308,6 +323,7 @@ model User {
   password_reset_tokens       PasswordResetToken[]
   email_change_tokens         EmailChangeToken[]
   payments                    Payment[]
+  store_orders                StoreOrder[]
 
   @@index([email])
   @@index([document_number_hash])
@@ -443,6 +459,7 @@ model Event {
   featured        Boolean       @default(false)
   ranking_points  Int?
   reward          String        @default("A definir")
+  rules_file_url  String?
   created_at      DateTime      @default(now())
   updated_at      DateTime      @updatedAt
   deleted_at      DateTime?
@@ -646,6 +663,7 @@ model ProfessionalSubscription {
   // AbacatePay subscription reference
   billing_id          String?
   checkout_url        String?
+  plan_type           String                         @default("mensal") @db.VarChar(20)
   amount_cents        Int
   status              ProfessionalSubscriptionStatus @default(pending_payment)
   // Vinculado após ativação via webhook
@@ -686,4 +704,67 @@ model RankingHistory {
   @@index([ranking_id])
   @@index([changed_at])
   @@map("ranking_history")
+}
+
+// ============================================================
+// LOJA
+// ============================================================
+
+model Product {
+  id          String          @id @default(uuid()) @db.Uuid
+  name        String          @db.VarChar(255)
+  description String?         @db.Text
+  price_cents Int
+  stock       Int             @default(0)
+  image_url   String?
+  category    ProductCategory @default(outros)
+  active      Boolean         @default(true)
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+  deleted_at  DateTime?
+
+  order_items StoreOrderItem[]
+
+  @@index([active])
+  @@index([category])
+  @@index([deleted_at])
+  @@map("products")
+}
+
+model StoreOrder {
+  id           String           @id @default(uuid()) @db.Uuid
+  user_id      String           @db.Uuid
+  status       StoreOrderStatus @default(pending_payment)
+  total_cents  Int
+  // AbacatePay reference
+  billing_id   String?
+  checkout_url String?
+  pix_code     String?
+  method       String           @default("pix") @db.VarChar(20)
+  expires_at   DateTime?
+  created_at   DateTime         @default(now())
+  updated_at   DateTime         @updatedAt
+
+  user  User             @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  items StoreOrderItem[]
+
+  @@index([user_id])
+  @@index([status])
+  @@index([billing_id])
+  @@map("store_orders")
+}
+
+model StoreOrderItem {
+  id               String @id @default(uuid()) @db.Uuid
+  order_id         String @db.Uuid
+  product_id       String @db.Uuid
+  quantity         Int
+  unit_price_cents Int
+
+  order   StoreOrder @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product Product    @relation(fields: [product_id], references: [id], onDelete: Restrict)
+
+  @@index([order_id])
+  @@index([product_id])
+  @@map("store_order_items")
 }

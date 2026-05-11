@@ -1,22 +1,93 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { storeConfig } from '../config';
-import { ShoppingCart, CreditCard, X, Plus, Minus, Tag } from 'lucide-react';
+import {
+  ShoppingCart, X, Plus, Minus, QrCode, CreditCard,
+  Loader2, CheckCircle2, AlertCircle, Package, RefreshCw, Copy, Check,
+} from 'lucide-react';
+import {
+  fetchLandingProducts,
+  createStoreOrder,
+  getStoreOrderStatus,
+} from '../lib/api';
+import { useAuthContext } from '../contexts/AuthContext';
+import { useAuthModal } from '../contexts/AuthModalContext';
+import { ProductModal } from '../components/ProductModal';
+import type { StoreProduct } from '../types/api';
 
 gsap.registerPlugin(ScrollTrigger);
+
+// ---- Tipos internos ----
+
+interface CartItem {
+  product: StoreProduct;
+  quantity: number;
+}
+
+type CheckoutStep =
+  | { type: 'method' }
+  | { type: 'pix'; orderId: string; pixCode: string; expiresAt: string }
+  | { type: 'card_redirect'; checkoutUrl: string }
+  | { type: 'polling'; orderId: string; method: 'pix' | 'credit_card' }
+  | { type: 'success' }
+  | { type: 'error'; message: string };
+
+// ---- Formatação de preço ----
+
+function formatPrice(cents: number): string {
+  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+// ---- Componente principal ----
 
 export function Store() {
   const sectionRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
   const productsRef = useRef<HTMLDivElement>(null);
-  const [cart, setCart] = useState<{product: typeof storeConfig.products[0], quantity: number}[]>([]);
+
+  const { user } = useAuthContext();
+  const { openAuthModal } = useAuthModal();
+
+  // Produtos vindos da API
+  const [products, setProducts] = useState<StoreProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [productError, setProductError] = useState(false);
+
+  // Produto selecionado para modal de detalhe
+  const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
+
+  // Carrinho
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
-  const [showCheckout, setShowCheckout] = useState(false);
+  const [pixCopied, setPixCopied] = useState(false);
+
+  // Checkout
+  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ---- Carrega produtos do backend ----
+  const loadProducts = useCallback(async () => {
+    setLoadingProducts(true);
+    setProductError(false);
+    try {
+      const { data } = await fetchLandingProducts({ per_page: 20 });
+      setProducts(data);
+    } catch {
+      setProductError(true);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, []);
 
   useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  // ---- Animações GSAP ----
+  useEffect(() => {
     const ctx = gsap.context(() => {
-      // Title animation
       gsap.fromTo(
         titleRef.current,
         { opacity: 0, y: 50 },
@@ -28,16 +99,15 @@ export function Store() {
           scrollTrigger: {
             trigger: titleRef.current,
             start: 'top 80%',
-            toggleActions: 'play none none reverse'
-          }
-        }
+            toggleActions: 'play none none reverse',
+          },
+        },
       );
 
-      // Products stagger animation
-      const products = productsRef.current?.querySelectorAll('.product-card');
-      if (products) {
+      const productCards = productsRef.current?.querySelectorAll('.product-card');
+      if (productCards && productCards.length > 0) {
         gsap.fromTo(
-          products,
+          productCards,
           { opacity: 0, y: 60 },
           {
             opacity: 1,
@@ -48,47 +118,128 @@ export function Store() {
             scrollTrigger: {
               trigger: productsRef.current,
               start: 'top 75%',
-              toggleActions: 'play none none reverse'
-            }
-          }
+              toggleActions: 'play none none reverse',
+            },
+          },
         );
       }
     }, sectionRef);
 
     return () => ctx.revert();
+  }, [products]);
+
+  // ---- Polling de status ----
+  const startPolling = useCallback((orderId: string, method: 'pix' | 'credit_card') => {
+    setCheckoutStep({ type: 'polling', orderId, method });
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const { status } = await getStoreOrderStatus(orderId);
+        if (status === 'paid') {
+          clearInterval(pollingRef.current!);
+          setCart([]);
+          setCheckoutStep({ type: 'success' });
+        } else if (status === 'cancelled' || status === 'refunded') {
+          clearInterval(pollingRef.current!);
+          setCheckoutStep({ type: 'error', message: 'Pagamento cancelado ou expirado. Tente novamente.' });
+        }
+      } catch {
+        // Continua polling silenciosamente
+      }
+    }, 3000);
   }, []);
 
-  const addToCart = (product: typeof storeConfig.products[0]) => {
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  // ---- Carrinho ----
+  const addToCart = (product: StoreProduct) => {
+    if (product.stock === 0) return;
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
+      const existing = prev.find(i => i.product.id === product.id);
       if (existing) {
-        return prev.map(item => 
-          item.product.id === product.id 
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+        if (existing.quantity >= product.stock) return prev;
+        return prev.map(i =>
+          i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i,
         );
       }
       return [...prev, { product, quantity: 1 }];
     });
   };
 
-  const removeFromCart = (productId: number) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
+  const removeFromCart = (productId: string) => {
+    setCart(prev => prev.filter(i => i.product.id !== productId));
   };
 
-  const updateQuantity = (productId: number, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.product.id === productId) {
-        const newQuantity = Math.max(0, item.quantity + delta);
-        return { ...item, quantity: newQuantity };
+  const updateQuantity = (productId: string, delta: number) => {
+    setCart(prev =>
+      prev
+        .map(i => {
+          if (i.product.id !== productId) return i;
+          const max = i.product.stock;
+          const newQty = Math.min(max, Math.max(0, i.quantity + delta));
+          return { ...i, quantity: newQty };
+        })
+        .filter(i => i.quantity > 0),
+    );
+  };
+
+  const cartTotal = cart.reduce((sum, i) => sum + i.product.price_cents * i.quantity, 0);
+  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
+
+  // ---- Checkout ----
+  const handleCheckout = async (method: 'pix' | 'credit_card') => {
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+
+    setCheckoutLoading(true);
+    try {
+      const session = await createStoreOrder({
+        items: cart.map(i => ({ product_id: i.product.id, quantity: i.quantity })),
+        method,
+      });
+
+      if (method === 'pix') {
+        if (session.pix_code) {
+          setCheckoutStep({
+            type: 'pix',
+            orderId: session.order_id,
+            pixCode: session.pix_code,
+            expiresAt: session.expires_at,
+          });
+          startPolling(session.order_id, 'pix');
+        } else {
+          setCheckoutStep({ type: 'error', message: 'O código PIX não foi gerado. Verifique se o gateway de pagamento está configurado e tente novamente.' });
+        }
+      } else if (method === 'credit_card') {
+        if (session.checkout_url) {
+          setCheckoutStep({ type: 'card_redirect', checkoutUrl: session.checkout_url });
+          window.open(session.checkout_url, '_blank');
+          startPolling(session.order_id, 'credit_card');
+        } else {
+          setCheckoutStep({ type: 'error', message: 'O link de checkout não foi gerado. Verifique se o gateway de pagamento está configurado e tente novamente.' });
+        }
       }
-      return item;
-    }).filter(item => item.quantity > 0));
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Erro ao criar pedido. Tente novamente.';
+      setCheckoutStep({ type: 'error', message });
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const closeCheckout = () => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    setCheckoutStep(null);
+  };
 
+  // ---- Render ----
   return (
     <section
       ref={sectionRef}
@@ -96,183 +247,252 @@ export function Store() {
       className="relative py-24 md:py-32 bg-[#0A0A0A]"
     >
       {/* Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#FF6B00]/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#4169E1]/5 rounded-full blur-3xl" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#FF4D00]/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#00FF87]/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8">
-        {/* Section Header */}
+        {/* Header */}
         <div ref={titleRef} className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-16">
           <div>
-            <span className="inline-block px-4 py-2 rounded-full bg-[#FF6B00]/10 border border-[#FF6B00]/20 text-[#FF6B00] text-sm font-medium mb-6">
+            <span className="inline-block px-4 py-2 rounded-full bg-[#00FF87]/10 border border-[#00FF87]/20 text-[#00FF87] text-sm font-medium mb-6 uppercase tracking-wider">
               {storeConfig.subtitle}
             </span>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-sans font-bold text-white tracking-tight mb-4">
               {storeConfig.titleRegular}{' '}
-              <span className="font-serif italic text-[#4169E1]">{storeConfig.titleItalic}</span>
+              <span className="font-serif italic text-[#00FF87]">{storeConfig.titleItalic}</span>
             </h2>
-            <p className="text-lg text-white/60 max-w-xl">
-              {storeConfig.description}
-            </p>
+            <p className="text-lg text-white/60 max-w-xl">{storeConfig.description}</p>
           </div>
 
-          {/* Cart Button */}
+          {/* Botão Carrinho */}
           <button
             onClick={() => setShowCart(true)}
-            className="flex items-center gap-3 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+            className="flex items-center gap-3 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors self-start md:self-auto"
           >
             <div className="relative">
               <ShoppingCart className="w-6 h-6 text-white" />
               {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 w-5 h-5 bg-[#FF6B00] rounded-full text-xs font-bold text-white flex items-center justify-center">
+                <span className="absolute -top-2 -right-2 w-5 h-5 bg-[#00FF87] rounded-full text-xs font-bold text-[#0A0A0A] flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
             </div>
             <span className="text-white font-medium">Carrinho</span>
             {cartTotal > 0 && (
-              <span className="text-[#FF6B00] font-semibold">
-                R$ {cartTotal.toFixed(2)}
-              </span>
+              <span className="text-[#00FF87] font-semibold">{formatPrice(cartTotal)}</span>
             )}
           </button>
         </div>
 
-        {/* Products Grid */}
-        <div ref={productsRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-          {storeConfig.products.map((product) => (
-            <div
-              key={product.id}
-              className="product-card group bg-[#141414] rounded-2xl overflow-hidden border border-white/5 hover:border-[#4169E1]/30 transition-all duration-500"
+        {/* Grid de Produtos */}
+        {loadingProducts ? (
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="w-10 h-10 text-[#00FF87] animate-spin" />
+          </div>
+        ) : productError ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <AlertCircle className="w-12 h-12 text-[#FF4D00]" />
+            <p className="text-white/60">Não foi possível carregar os produtos.</p>
+            <button
+              onClick={loadProducts}
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-sm transition-colors"
             >
-              {/* Image */}
-              <div className="relative aspect-square overflow-hidden">
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                />
-                
-                {/* Discount Badge */}
-                {product.originalPrice && (
-                  <div className="absolute top-3 left-3 px-2 py-1 bg-[#FF6B00] rounded-lg text-xs font-bold text-white">
-                    -{Math.round((1 - product.price / product.originalPrice) * 100)}%
+              <RefreshCw className="w-4 h-4" />
+              Tentar novamente
+            </button>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <Package className="w-12 h-12 text-white/20" />
+            <p className="text-white/40">Nenhum produto disponível no momento.</p>
+          </div>
+        ) : (
+          <div
+            ref={productsRef}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6"
+          >
+            {products.map(product => {
+              const inCart = cart.find(i => i.product.id === product.id);
+              const outOfStock = product.stock === 0;
+
+              return (
+                <div
+                  key={product.id}
+                  className="product-card group bg-[#141414] rounded-2xl overflow-hidden border border-white/5 hover:border-[#00FF87]/30 transition-all duration-500 cursor-pointer"
+                  onClick={() => setSelectedProduct(product)}
+                >
+                  {/* Imagem */}
+                  <div className="relative aspect-square overflow-hidden bg-[#1a1a1a]">
+                    {product.image_url ? (
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-16 h-16 text-white/10" />
+                      </div>
+                    )}
+
+                    {outOfStock && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                        <span className="px-3 py-1 bg-[#FF4D00]/90 rounded-full text-xs font-bold text-white uppercase tracking-wider">
+                          Esgotado
+                        </span>
+                      </div>
+                    )}
+
+                    {!outOfStock && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                        aria-label={`Adicionar ${product.name} ao carrinho`}
+                        className="absolute bottom-3 right-3 w-10 h-10 bg-[#00FF87] hover:bg-[#00cc6a] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0"
+                      >
+                        <Plus className="w-5 h-5 text-[#0A0A0A]" />
+                      </button>
+                    )}
                   </div>
-                )}
 
-                {/* Quick Add Button */}
-                <button
-                  onClick={() => addToCart(product)}
-                  className="absolute bottom-3 right-3 w-10 h-10 bg-[#4169E1] hover:bg-[#5A7FE8] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0"
-                >
-                  <Plus className="w-5 h-5 text-white" />
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="p-4">
-                <span className="text-white/40 text-xs uppercase tracking-wider">{product.category}</span>
-                <h3 className="text-white font-semibold mt-1 mb-2 line-clamp-2 group-hover:text-[#4169E1] transition-colors">
-                  {product.name}
-                </h3>
-                <p className="text-white/50 text-sm mb-3 line-clamp-2">{product.description}</p>
-                
-                {/* Price */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-white">
-                    R$ {product.price.toFixed(2)}
-                  </span>
-                  {product.originalPrice && (
-                    <span className="text-sm text-white/40 line-through">
-                      R$ {product.originalPrice.toFixed(2)}
+                  {/* Conteúdo */}
+                  <div className="p-4">
+                    <span className="text-white/40 text-xs uppercase tracking-wider">
+                      {product.category.replace('_', ' ')}
                     </span>
-                  )}
-                </div>
+                    <h3 className="text-white font-semibold mt-1 mb-2 line-clamp-2 group-hover:text-[#00FF87] transition-colors text-sm">
+                      {product.name}
+                    </h3>
+                    {product.description && (
+                      <p className="text-white/40 text-xs mb-3 line-clamp-2">{product.description}</p>
+                    )}
 
-                {/* Add to Cart */}
-                <button
-                  onClick={() => addToCart(product)}
-                  className="w-full mt-4 py-2 bg-white/5 hover:bg-[#4169E1] text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  <ShoppingCart className="w-4 h-4" />
-                  Adicionar
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                    <div className="text-lg font-bold text-white mb-3">
+                      {formatPrice(product.price_cents)}
+                    </div>
+
+                    {inCart ? (
+                      <div className="flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => updateQuantity(product.id, -1)}
+                          aria-label="Remover um"
+                          className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
+                        >
+                          <Minus className="w-3.5 h-3.5 text-white" />
+                        </button>
+                        <span className="text-white font-semibold text-sm">{inCart.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(product.id, 1)}
+                          disabled={inCart.quantity >= product.stock}
+                          aria-label="Adicionar um"
+                          className="w-8 h-8 bg-[#00FF87]/20 hover:bg-[#00FF87]/30 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#00FF87]" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                        disabled={outOfStock}
+                        className="w-full py-2 bg-white/5 hover:bg-[#00FF87]/10 hover:border-[#00FF87]/30 border border-white/10 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <ShoppingCart className="w-4 h-4" />
+                        {outOfStock ? 'Indisponível' : 'Adicionar'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Cart Modal */}
+      {/* ---- Modal Carrinho ---- */}
       {showCart && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div 
+          <div
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             onClick={() => setShowCart(false)}
           />
-          <div className="relative w-full max-w-lg bg-[#141414] border border-white/10 rounded-2xl max-h-[80vh] flex flex-col">
-            {/* Header */}
+          <div className="relative w-full max-w-lg bg-[#141414] border border-white/10 rounded-2xl max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-white/5">
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5" />
+                <ShoppingCart className="w-5 h-5 text-[#00FF87]" />
                 Seu Carrinho
+                {cartCount > 0 && (
+                  <span className="text-sm text-white/50 font-normal">({cartCount} {cartCount === 1 ? 'item' : 'itens'})</span>
+                )}
               </h2>
-              <button 
+              <button
                 onClick={() => setShowCart(false)}
+                aria-label="Fechar carrinho"
                 className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
               >
                 <X className="w-5 h-5 text-white/60" />
               </button>
             </div>
 
-            {/* Cart Items */}
             <div className="flex-1 overflow-auto p-6">
               {cart.length === 0 ? (
                 <div className="text-center py-12">
-                  <ShoppingCart className="w-16 h-16 text-white/20 mx-auto mb-4" />
-                  <p className="text-white/60">Seu carrinho está vazio</p>
+                  <ShoppingCart className="w-16 h-16 text-white/10 mx-auto mb-4" />
+                  <p className="text-white/40">Seu carrinho está vazio.</p>
                   <button
                     onClick={() => setShowCart(false)}
-                    className="mt-4 text-[#4169E1] hover:underline"
+                    className="mt-4 text-[#00FF87] hover:underline text-sm"
                   >
                     Continuar comprando
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {cart.map((item) => (
+                <div className="space-y-3">
+                  {cart.map(item => (
                     <div key={item.product.id} className="flex gap-4 p-4 bg-white/5 rounded-xl">
-                      <img
-                        src={item.product.image}
-                        alt={item.product.name}
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
-                      <div className="flex-1">
-                        <h4 className="text-white font-medium">{item.product.name}</h4>
-                        <p className="text-white/50 text-sm">{item.product.category}</p>
-                        <p className="text-[#FF6B00] font-semibold mt-1">
-                          R$ {item.product.price.toFixed(2)}
+                      <div className="w-20 h-20 rounded-lg overflow-hidden bg-[#1a1a1a] shrink-0">
+                        {item.product.image_url ? (
+                          <img
+                            src={item.product.image_url}
+                            alt={item.product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package className="w-8 h-8 text-white/10" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-white font-medium text-sm leading-snug line-clamp-2">
+                          {item.product.name}
+                        </h4>
+                        <p className="text-[#00FF87] font-semibold mt-1 text-sm">
+                          {formatPrice(item.product.price_cents)}
                         </p>
                       </div>
-                      <div className="flex flex-col items-end justify-between">
+                      <div className="flex flex-col items-end justify-between shrink-0">
                         <button
                           onClick={() => removeFromCart(item.product.id)}
-                          className="text-white/40 hover:text-red-500 transition-colors"
+                          aria-label="Remover item"
+                          className="text-white/30 hover:text-[#FF4D00] transition-colors"
                         >
                           <X className="w-4 h-4" />
                         </button>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => updateQuantity(item.product.id, -1)}
-                            className="w-6 h-6 bg-white/10 rounded flex items-center justify-center hover:bg-white/20"
+                            className="w-6 h-6 bg-white/10 rounded flex items-center justify-center hover:bg-white/20 transition-colors"
                           >
                             <Minus className="w-3 h-3 text-white" />
                           </button>
-                          <span className="text-white w-6 text-center">{item.quantity}</span>
+                          <span className="text-white w-6 text-center text-sm font-medium">
+                            {item.quantity}
+                          </span>
                           <button
                             onClick={() => updateQuantity(item.product.id, 1)}
-                            className="w-6 h-6 bg-white/10 rounded flex items-center justify-center hover:bg-white/20"
+                            disabled={item.quantity >= item.product.stock}
+                            className="w-6 h-6 bg-white/10 rounded flex items-center justify-center hover:bg-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             <Plus className="w-3 h-3 text-white" />
                           </button>
@@ -284,21 +504,18 @@ export function Store() {
               )}
             </div>
 
-            {/* Footer */}
             {cart.length > 0 && (
               <div className="p-6 border-t border-white/5">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-5">
                   <span className="text-white/60">Total</span>
-                  <span className="text-2xl font-bold text-white">
-                    R$ {cartTotal.toFixed(2)}
-                  </span>
+                  <span className="text-2xl font-bold text-white">{formatPrice(cartTotal)}</span>
                 </div>
                 <button
                   onClick={() => {
                     setShowCart(false);
-                    setShowCheckout(true);
+                    setCheckoutStep({ type: 'method' });
                   }}
-                  className="w-full btn-secondary flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[#00FF87] hover:bg-[#00cc6a] text-[#0A0A0A] font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
                   <CreditCard className="w-5 h-5" />
                   Finalizar Compra
@@ -309,64 +526,206 @@ export function Store() {
         </div>
       )}
 
-      {/* Checkout Modal */}
-      {showCheckout && (
+      {/* ---- Modal Checkout ---- */}
+      {checkoutStep && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div 
+          <div
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            onClick={() => setShowCheckout(false)}
+            onClick={checkoutStep.type !== 'polling' ? closeCheckout : undefined}
           />
           <div className="relative w-full max-w-md bg-[#141414] border border-white/10 rounded-2xl p-8">
-            <button 
-              onClick={() => setShowCheckout(false)}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
-            >
-              <X className="w-5 h-5 text-white/60" />
-            </button>
-            
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#4169E1]/20 flex items-center justify-center">
-                <CreditCard className="w-8 h-8 text-[#4169E1]" />
-              </div>
-              <h2 className="text-2xl font-sans font-bold text-white mb-2">Finalizar Compra</h2>
-              <p className="text-white/60">Total: <span className="text-[#FF6B00] font-bold">R$ {cartTotal.toFixed(2)}</span></p>
-            </div>
-            
-            <div className="space-y-3">
-              <button 
-                onClick={() => alert('Sistema de pagamento em desenvolvimento')}
-                className="w-full p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl flex items-center gap-4 transition-all"
+            {checkoutStep.type !== 'polling' && checkoutStep.type !== 'success' && (
+              <button
+                onClick={closeCheckout}
+                aria-label="Fechar"
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
               >
-                <div className="w-10 h-10 rounded-lg bg-[#4169E1]/20 flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-[#4169E1]" />
-                </div>
-                <div className="text-left">
-                  <p className="text-white font-medium">Cartão de Crédito</p>
-                  <p className="text-white/50 text-sm">Parcelamento disponível</p>
-                </div>
+                <X className="w-5 h-5 text-white/60" />
               </button>
-              
-              <button 
-                onClick={() => alert('Sistema de pagamento em desenvolvimento')}
-                className="w-full p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl flex items-center gap-4 transition-all"
-              >
-                <div className="w-10 h-10 rounded-lg bg-[#FF6B00]/20 flex items-center justify-center">
-                  <Tag className="w-5 h-5 text-[#FF6B00]" />
-                </div>
-                <div className="text-left">
-                  <p className="text-white font-medium">PIX</p>
-                  <p className="text-white/50 text-sm">Pagamento instantâneo</p>
-                </div>
-              </button>
-            </div>
+            )}
 
-            <div className="mt-6 p-4 bg-[#FF6B00]/10 rounded-xl">
-              <p className="text-sm text-white/60 text-center">
-                <span className="text-[#FF6B00]">Atenção:</span> Os créditos adquiridos não podem ser convertidos em dinheiro.
-              </p>
-            </div>
+            {/* Escolha do método */}
+            {checkoutStep.type === 'method' && (
+              <>
+                <div className="text-center mb-8">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#00FF87]/10 flex items-center justify-center">
+                    <ShoppingCart className="w-8 h-8 text-[#00FF87]" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-1">Finalizar Compra</h2>
+                  <p className="text-white/50 text-sm">
+                    Total:{' '}
+                    <span className="text-[#00FF87] font-semibold">{formatPrice(cartTotal)}</span>
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleCheckout('pix')}
+                    disabled={checkoutLoading}
+                    className="w-full p-4 bg-white/5 hover:bg-[#00FF87]/10 border border-white/10 hover:border-[#00FF87]/30 rounded-xl flex items-center gap-4 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-[#00FF87]/10 flex items-center justify-center shrink-0">
+                      {checkoutLoading ? (
+                        <Loader2 className="w-5 h-5 text-[#00FF87] animate-spin" />
+                      ) : (
+                        <QrCode className="w-5 h-5 text-[#00FF87]" />
+                      )}
+                    </div>
+                    <div className="text-left">
+                      <p className="text-white font-medium">PIX</p>
+                      <p className="text-white/50 text-sm">Aprovação instantânea</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleCheckout('credit_card')}
+                    disabled={checkoutLoading}
+                    className="w-full p-4 bg-white/5 hover:bg-[#00FF87]/10 border border-white/10 hover:border-[#00FF87]/30 rounded-xl flex items-center gap-4 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-[#00FF87]/10 flex items-center justify-center shrink-0">
+                      <CreditCard className="w-5 h-5 text-[#00FF87]" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-white font-medium">Cartão de Crédito</p>
+                      <p className="text-white/50 text-sm">Parcelamento disponível</p>
+                    </div>
+                  </button>
+                </div>
+
+                {!user && (
+                  <p className="mt-5 text-center text-white/40 text-xs">
+                    Você será redirecionado para fazer login antes de finalizar.
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* PIX QR Code */}
+            {checkoutStep.type === 'pix' && (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#00FF87]/10 flex items-center justify-center">
+                    <QrCode className="w-7 h-7 text-[#00FF87]" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white mb-1">Pague via PIX</h2>
+                  <p className="text-white/50 text-sm">{formatPrice(cartTotal)}</p>
+                </div>
+
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6">
+                  <p className="text-white/50 text-xs mb-2 uppercase tracking-wider">Código PIX Copia e Cola</p>
+                  <p className="text-white/80 text-xs font-mono break-all leading-relaxed select-all">
+                    {checkoutStep.pixCode}
+                  </p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(checkoutStep.pixCode);
+                      setPixCopied(true);
+                      setTimeout(() => setPixCopied(false), 2500);
+                    }}
+                    className="mt-3 w-full py-2 bg-[#00FF87]/10 hover:bg-[#00FF87]/20 border border-[#00FF87]/20 rounded-lg text-[#00FF87] text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    {pixCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {pixCopied ? 'Copiado!' : 'Copiar Código PIX'}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 justify-center text-white/40 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Aguardando confirmação do pagamento...
+                </div>
+              </>
+            )}
+
+            {/* Redirecionamento cartão */}
+            {checkoutStep.type === 'card_redirect' && (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[#00FF87]/10 flex items-center justify-center">
+                    <CreditCard className="w-7 h-7 text-[#00FF87]" />
+                  </div>
+                  <h2 className="text-xl font-bold text-white mb-2">Checkout Aberto</h2>
+                  <p className="text-white/50 text-sm">
+                    Complete o pagamento na aba que foi aberta. Esta janela detectará automaticamente quando o pagamento for confirmado.
+                  </p>
+                </div>
+                <button
+                  onClick={() => window.open(checkoutStep.checkoutUrl, '_blank')}
+                  className="w-full py-3 bg-[#00FF87] hover:bg-[#00cc6a] text-[#0A0A0A] font-bold rounded-xl transition-colors text-sm"
+                >
+                  Reabrir Checkout
+                </button>
+                <div className="flex items-center gap-2 justify-center text-white/40 text-sm mt-4">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Aguardando confirmação...
+                </div>
+              </>
+            )}
+
+            {/* Polling */}
+            {checkoutStep.type === 'polling' && (
+              <div className="text-center py-4">
+                <Loader2 className="w-12 h-12 text-[#00FF87] animate-spin mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-white mb-2">Verificando pagamento</h2>
+                <p className="text-white/50 text-sm">
+                  {checkoutStep.method === 'pix'
+                    ? 'Aguardando confirmação do PIX...'
+                    : 'Aguardando confirmação do pagamento no cartão...'}
+                </p>
+              </div>
+            )}
+
+            {/* Sucesso */}
+            {checkoutStep.type === 'success' && (
+              <div className="text-center py-4">
+                <CheckCircle2 className="w-16 h-16 text-[#00FF87] mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-white mb-2">Pedido Confirmado!</h2>
+                <p className="text-white/60 text-sm mb-6">
+                  Seu pedido foi recebido. Entraremos em contato para combinar a entrega.
+                </p>
+                <button
+                  onClick={closeCheckout}
+                  className="w-full py-3 bg-[#00FF87] hover:bg-[#00cc6a] text-[#0A0A0A] font-bold rounded-xl transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+            )}
+
+            {/* Erro */}
+            {checkoutStep.type === 'error' && (
+              <div className="text-center py-4">
+                <AlertCircle className="w-14 h-14 text-[#FF4D00] mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-white mb-2">Ops, algo deu errado</h2>
+                <p className="text-white/50 text-sm mb-6">{checkoutStep.message}</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeCheckout}
+                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium rounded-xl transition-colors text-sm"
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    onClick={() => setCheckoutStep({ type: 'method' })}
+                    className="flex-1 py-3 bg-[#00FF87] hover:bg-[#00cc6a] text-[#0A0A0A] font-bold rounded-xl transition-colors text-sm"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      )}
+
+      {/* ---- Modal detalhe do produto ---- */}
+      {selectedProduct && (
+        <ProductModal
+          product={selectedProduct}
+          cartQuantity={cart.find(i => i.product.id === selectedProduct.id)?.quantity ?? 0}
+          onClose={() => setSelectedProduct(null)}
+          onAdd={() => addToCart(selectedProduct)}
+          onRemove={() => updateQuantity(selectedProduct.id, -1)}
+        />
       )}
     </section>
   );

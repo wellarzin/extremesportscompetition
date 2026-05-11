@@ -25,6 +25,10 @@ import type {
   ProfessionalSubscribeInput,
   ProfessionalSubscriptionSession,
   ProfessionalSubscriptionStatusResponse,
+  StoreProduct,
+  StoreOrderSession,
+  StoreOrderStatusResponse,
+  StoreOrder,
 } from '../types/api';
 
 export type { RegisterInput };
@@ -572,4 +576,67 @@ export async function fetchLandingNewsBySlug(
     false,
   );
   return res.data;
+}
+
+// ============================================================
+// Loja — Produtos (público, sem auth)
+// ============================================================
+
+export interface FetchProductsParams {
+  category?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export async function fetchLandingProducts(
+  params: FetchProductsParams = {},
+): Promise<{ data: StoreProduct[]; meta: ApiMeta }> {
+  const qs = new URLSearchParams();
+  if (params.category) qs.set('category', params.category);
+  qs.set('page', String(params.page ?? 1));
+  qs.set('per_page', String(params.per_page ?? 20));
+
+  const res = await request<ApiResponse<StoreProduct[]>>(
+    `/api/v1/landing/products?${qs.toString()}`,
+    { method: 'GET' },
+    false,
+  );
+  return { data: res.data, meta: res.meta! };
+}
+
+// ============================================================
+// Loja — Pedidos (requer autenticação)
+// ============================================================
+
+export interface CreateOrderInput {
+  items: Array<{ product_id: string; quantity: number }>;
+  method: 'pix' | 'credit_card';
+}
+
+export async function createStoreOrder(data: CreateOrderInput): Promise<StoreOrderSession> {
+  const res = await request<ApiResponse<StoreOrderSession>>(
+    '/api/v1/store/orders',
+    { method: 'POST', body: JSON.stringify(data) },
+  );
+  return res.data;
+}
+
+export async function getStoreOrderStatus(orderId: string): Promise<StoreOrderStatusResponse> {
+  const res = await request<ApiResponse<StoreOrderStatusResponse>>(
+    `/api/v1/store/orders/${encodeURIComponent(orderId)}/status`,
+    { method: 'GET' },
+  );
+  return res.data;
+}
+
+export async function fetchMyStoreOrders(
+  page = 1,
+  per_page = 10,
+): Promise<{ data: StoreOrder[]; meta: ApiMeta }> {
+  const qs = new URLSearchParams({ page: String(page), per_page: String(per_page) });
+  const res = await request<ApiResponse<StoreOrder[]>>(
+    `/api/v1/store/orders?${qs.toString()}`,
+    { method: 'GET' },
+  );
+  return { data: res.data, meta: res.meta! };
 }

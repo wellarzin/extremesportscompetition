@@ -54,6 +54,7 @@ export interface LandingEvent {
 export interface LandingEventDetail extends LandingEvent {
   description: string;
   rules: string | null;
+  rules_file_url: string | null;
   created_at: string;
 }
 
@@ -186,6 +187,8 @@ export interface ProfessionalSubscriptionStatusResponse {
   updated_at: string;
 }
 
+export type ProfessionalPlanType = 'mensal' | 'trimestral' | 'semestral' | 'anual';
+
 export interface ProfessionalSubscribeInput {
   full_name: string;
   birth_date: string;
@@ -193,7 +196,59 @@ export interface ProfessionalSubscribeInput {
   registration_number: string;
   registration_type: string;
   bio?: string;
+  plan_type: ProfessionalPlanType;
   specialties: Array<{ specialty: string; notes?: string }>;
+}
+
+// ---- Loja ----
+
+export type ProductCategory = 'vestuario' | 'acessorios' | 'equipamentos' | 'nutricao' | 'outros';
+export type StoreOrderStatus = 'pending_payment' | 'paid' | 'cancelled' | 'refunded';
+
+export interface StoreProduct {
+  id: string;
+  name: string;
+  description: string | null;
+  price_cents: number;
+  stock: number;
+  image_url: string | null;
+  category: ProductCategory;
+}
+
+export interface StoreOrderSession {
+  order_id: string;
+  billing_id: string;
+  method: 'pix' | 'credit_card';
+  pix_code: string | null;
+  pix_qr_code: string | null;
+  checkout_url: string | null;
+  total_cents: number;
+  expires_at: string;
+}
+
+export interface StoreOrderStatusResponse {
+  status: StoreOrderStatus;
+}
+
+export interface StoreOrderItem {
+  id: string;
+  quantity: number;
+  unit_price_cents: number;
+  product: {
+    id: string;
+    name: string;
+    image_url: string | null;
+    category: string;
+  };
+}
+
+export interface StoreOrder {
+  id: string;
+  status: StoreOrderStatus;
+  total_cents: number;
+  method: string;
+  created_at: string;
+  items: StoreOrderItem[];
 }
 
 export interface RegisterInput {

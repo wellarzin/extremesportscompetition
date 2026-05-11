@@ -325,4 +325,52 @@ export async function eventsRoutes(app: FastifyInstance) {
     preHandler: [authenticate],
     handler: eventsController.cancelEnroll,
   });
+
+  // ----------------------------------------------------------
+  // POST /events/:id/rules-pdf — Upload do PDF de regulamento
+  // ----------------------------------------------------------
+  app.post("/:id/rules-pdf", {
+    schema: {
+      tags: ["Events"],
+      summary: "Upload do PDF de regulamento do evento",
+      description: "Aceita apenas arquivos PDF (máx. 10 MB). Requer ser o organizador do evento ou admin.",
+      consumes: ["multipart/form-data"],
+      params: {
+        type: "object",
+        required: ["id"],
+        properties: { id: { type: "string", format: "uuid" } },
+      },
+      body: {
+        type: "object",
+        required: ["file"],
+        properties: {
+          file: {
+            type: "string",
+            format: "binary",
+            description: "Arquivo PDF do regulamento (máx. 10 MB)",
+          },
+        },
+      },
+      response: {
+        200: {
+          description: "PDF enviado com sucesso",
+          type: "object",
+          properties: {
+            success: { type: "boolean" },
+            data: {
+              type: "object",
+              properties: { rules_file_url: { type: "string" } },
+            },
+          },
+        },
+        401: errorSchema("Não autorizado"),
+        403: errorSchema("Sem permissão"),
+        404: errorSchema("Evento não encontrado"),
+        422: errorSchema("Arquivo inválido"),
+      },
+    },
+    validatorCompiler: () => () => true,
+    preHandler: [authenticate],
+    handler: eventsController.uploadEventRulesPdf,
+  });
 }

@@ -368,6 +368,7 @@ export async function landingRoutes(app: FastifyInstance) {
                 end_datetime: { type: "string", format: "date-time", nullable: true },
                 description: { type: "string" },
                 rules: { type: "string", nullable: true },
+                rules_file_url: { type: "string", nullable: true },
                 location: { type: "string", nullable: true },
                 city: { type: "string", nullable: true },
                 state: { type: "string", nullable: true },
@@ -407,6 +408,7 @@ export async function landingRoutes(app: FastifyInstance) {
           end_datetime: true,
           description: true,
           rules: true,
+          rules_file_url: true,
           location: true,
           city: true,
           state: true,
@@ -629,6 +631,96 @@ export async function landingRoutes(app: FastifyInstance) {
       if (!result.success) return Errors.validation(reply, result.error.errors.map((e) => ({ field: e.path.join("."), message: e.message })));
       request.query = result.data as any;
       return listPublishedNews(request as any, reply);
+    },
+  });
+
+  // ----------------------------------------------------------
+  // GET /landing/products — Produtos da loja (público)
+  // ----------------------------------------------------------
+  app.get("/products", {
+    schema: {
+      tags: ["🏠 Landing Page"],
+      summary: "Lista produtos da loja para a landing page",
+      description: "Retorna produtos ativos e em estoque. Público, sem autenticação.",
+      security: [],
+      querystring: {
+        type: "object",
+        properties: {
+          category: {
+            type: "string",
+            enum: ["vestuario", "acessorios", "equipamentos", "nutricao", "outros"],
+          },
+          page: { type: "integer", minimum: 1, default: 1 },
+          per_page: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+        },
+      },
+      response: {
+        200: {
+          type: "object",
+          properties: {
+            success: { type: "boolean", example: true },
+            data: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string", format: "uuid" },
+                  name: { type: "string" },
+                  description: { type: "string", nullable: true },
+                  price_cents: { type: "integer" },
+                  stock: { type: "integer" },
+                  image_url: { type: "string", nullable: true },
+                  category: { type: "string" },
+                },
+              },
+            },
+            meta: {
+              type: "object",
+              properties: {
+                page: { type: "integer" },
+                per_page: { type: "integer" },
+                total: { type: "integer" },
+                total_pages: { type: "integer" },
+              },
+            },
+          },
+        },
+      },
+    },
+    handler: async (request, reply) => {
+      const q = request.query as Record<string, string | undefined>;
+      const page = Math.max(1, Number(q.page ?? 1));
+      const perPage = Math.min(50, Math.max(1, Number(q.per_page ?? 20)));
+      const skip = (page - 1) * perPage;
+
+      const where: Record<string, unknown> = { active: true, deleted_at: null, stock: { gt: 0 } };
+      if (q.category) where.category = q.category;
+
+      const [products, total] = await Promise.all([
+        prisma.product.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            price_cents: true,
+            stock: true,
+            image_url: true,
+            category: true,
+          },
+          orderBy: { created_at: "asc" },
+          skip,
+          take: perPage,
+        }),
+        prisma.product.count({ where }),
+      ]);
+
+      return sendSuccess(reply, products, 200, {
+        page,
+        per_page: perPage,
+        total,
+        total_pages: Math.ceil(total / perPage),
+      });
     },
   });
 

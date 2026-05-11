@@ -13,9 +13,12 @@ import {
   Loader2,
   Camera,
   Upload,
+  ShoppingBag,
+  Percent,
 } from 'lucide-react';
 import { subscribeProfessional, getMyProfessionalSubscriptionStatus, uploadSubscriptionPhoto } from '../lib/api';
 import { ApiError } from '../lib/api';
+import type { ProfessionalPlanType } from '../types/api';
 
 // ---- Constantes ----
 
@@ -53,10 +56,55 @@ const REGISTRATION_TYPES = [
 ];
 
 const PLAN_BENEFITS = [
-  { icon: Users, text: 'Visibilidade para +15 mil atletas e trabalhadores' },
+  { icon: Users, text: 'Visibilidade para +800 atletas e trabalhadores' },
   { icon: Star, text: 'Perfil em destaque na landing page' },
   { icon: Zap, text: 'Leads de clientes interessados na sua especialidade' },
   { icon: Shield, text: 'Selo de profissional verificado pela plataforma' },
+  { icon: ShoppingBag, text: 'Desconto exclusivo na loja de produtos Extreme Competition' },
+];
+
+interface PlanConfig {
+  key: ProfessionalPlanType;
+  label: string;
+  priceCents: number;
+  period: string;
+  billing: string;
+  discountBadge?: string;
+  highlight?: boolean;
+}
+
+const SUBSCRIPTION_PLANS: PlanConfig[] = [
+  {
+    key: 'mensal',
+    label: 'Mensal',
+    priceCents: 8599,    // R$85,99/mês
+    period: '/mês',
+    billing: 'Cobrado mensalmente',
+  },
+  {
+    key: 'trimestral',
+    label: 'Trimestral',
+    priceCents: 8599,    // R$85,99/mês × 3 = R$257,97 total
+    period: '/mês',
+    billing: 'R$ 257,97 em 3 cobranças mensais',
+  },
+  {
+    key: 'semestral',
+    label: 'Semestral',
+    priceCents: 8169,    // R$81,69/mês × 6 = R$490,14 total
+    period: '/mês',
+    billing: 'R$ 490,14 em 6 cobranças mensais',
+    discountBadge: '5% off',
+    highlight: true,
+  },
+  {
+    key: 'anual',
+    label: 'Anual',
+    priceCents: 7739,    // R$77,39/mês × 12 = R$928,68 total
+    period: '/mês',
+    billing: 'R$ 928,68 em 12 cobranças mensais',
+    discountBadge: '10% off',
+  },
 ];
 
 // ---- Tipos internos ----
@@ -70,6 +118,7 @@ interface FormData {
   bio: string;
   specialties: string[];
   photo: File | null;
+  plan_type: ProfessionalPlanType;
 }
 
 interface Props {
@@ -95,6 +144,7 @@ export function CreateProfessionalModal({ onClose }: Props) {
     bio: '',
     specialties: [],
     photo: null,
+    plan_type: 'mensal',
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const photoPreviewRef = useRef<string | null>(null);
@@ -207,6 +257,7 @@ export function CreateProfessionalModal({ onClose }: Props) {
         registration_number: form.registration_number.trim(),
         registration_type: form.registration_type,
         bio: form.bio.trim() || undefined,
+        plan_type: form.plan_type,
         specialties: form.specialties.map((s) => ({ specialty: s })),
       });
 
@@ -579,63 +630,99 @@ export function CreateProfessionalModal({ onClose }: Props) {
 
           {/* Step 3: Plano & Pagamento */}
           {!isCheckingStatus && !pendingCheckoutUrl && step === 3 && (
-            <div className="space-y-5">
-              {/* Plan card */}
-              <div className="rounded-xl border border-[#00FF87]/20 bg-[#00FF87]/5 p-5">
-                <div className="flex items-baseline justify-between mb-4">
-                  <div>
-                    <p className="text-xs text-[#00FF87] font-semibold tracking-widest uppercase mb-1">
-                      Plano Profissional
-                    </p>
-                    <h3 className="text-2xl font-black text-white">
-                      R$ 49<span className="text-base font-bold">,90</span>
-                      <span className="text-sm font-medium text-white/40 ml-1">/mês</span>
-                    </h3>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-white/40">Cobrança mensal</span>
-                    <p className="text-xs text-white/30">Cancele quando quiser</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2.5">
-                  {PLAN_BENEFITS.map(({ icon: Icon, text }, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-lg bg-[#00FF87]/10 flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-3.5 h-3.5 text-[#00FF87]" />
-                      </div>
-                      <p className="text-sm text-white/70">{text}</p>
-                    </div>
-                  ))}
+            <div className="space-y-4">
+              {/* Seleção de plano */}
+              <div>
+                <p className="text-xs text-white/40 font-semibold uppercase tracking-wider mb-3">Escolha seu plano</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {SUBSCRIPTION_PLANS.map((plan) => {
+                    const selected = form.plan_type === plan.key;
+                    const priceInt = Math.floor(plan.priceCents / 100);
+                    const priceDec = String(plan.priceCents % 100).padStart(2, '0');
+                    return (
+                      <button
+                        key={plan.key}
+                        onClick={() => setField('plan_type', plan.key)}
+                        className={`relative flex flex-col items-start p-3 rounded-xl border text-left transition-all ${
+                          selected
+                            ? 'border-[#00FF87]/60 bg-[#00FF87]/8 ring-1 ring-[#00FF87]/30'
+                            : plan.highlight
+                            ? 'border-[#4169E1]/30 bg-[#4169E1]/5 hover:border-[#4169E1]/50'
+                            : 'border-white/10 bg-white/[0.02] hover:border-white/20'
+                        }`}
+                      >
+                        {plan.discountBadge && (
+                          <span className="absolute -top-2 -right-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[#00FF87] text-black flex items-center gap-0.5">
+                            <Percent className="w-2.5 h-2.5" />
+                            {plan.discountBadge}
+                          </span>
+                        )}
+                        {plan.highlight && !plan.discountBadge && (
+                          <span className="absolute -top-2 left-2 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-[#4169E1] text-white">
+                            Popular
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 transition-all ${
+                            selected ? 'border-[#00FF87] bg-[#00FF87]' : 'border-white/30'
+                          }`}>
+                            {selected && <Check className="w-3.5 h-3.5 text-black p-0.5" />}
+                          </div>
+                          <span className={`text-xs font-bold ${selected ? 'text-[#00FF87]' : 'text-white/70'}`}>
+                            {plan.label}
+                          </span>
+                        </div>
+                        <p className="text-white font-black text-lg leading-none">
+                          R$ {priceInt}<span className="text-sm font-bold">,{priceDec}</span>
+                          <span className="text-xs font-normal text-white/40 ml-0.5">{plan.period}</span>
+                        </p>
+                        <p className="text-[10px] text-white/30 mt-1 leading-tight">{plan.billing}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Benefícios */}
+              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 space-y-2">
+                <p className="text-xs text-white/40 font-semibold uppercase tracking-wider mb-2">Incluso em todos os planos</p>
+                {PLAN_BENEFITS.map(({ icon: Icon, text }, i) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-[#00FF87]/10 flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-3 h-3 text-[#00FF87]" />
+                    </div>
+                    <p className="text-xs text-white/60">{text}</p>
+                  </div>
+                ))}
+              </div>
+
               {/* Resumo */}
-              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 space-y-2">
-                <p className="text-xs text-white/40 font-semibold uppercase tracking-wider mb-3">Resumo</p>
-                <div className="flex justify-between text-sm">
+              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 space-y-1.5">
+                <p className="text-xs text-white/40 font-semibold uppercase tracking-wider mb-2">Resumo</p>
+                <div className="flex justify-between text-xs">
                   <span className="text-white/50">Nome</span>
-                  <span className="text-white font-medium truncate ml-4 max-w-[200px]">{form.full_name}</span>
+                  <span className="text-white font-medium truncate ml-4 max-w-[180px]">{form.full_name}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-white/50">Registro</span>
-                  <span className="text-white font-medium">
-                    {form.registration_type} {form.registration_number}
-                  </span>
+                  <span className="text-white font-medium">{form.registration_type} {form.registration_number}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-white/50">Especialidades</span>
                   <span className="text-white font-medium">{form.specialties.length} selecionada(s)</span>
+                </div>
+                <div className="flex justify-between text-xs pt-1 border-t border-white/5">
+                  <span className="text-white/50">Plano</span>
+                  <span className="text-[#00FF87] font-bold capitalize">{form.plan_type}</span>
                 </div>
               </div>
 
               {/* Payment info */}
-              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-white/[0.02] border border-white/5">
-                <CreditCard className="w-4 h-4 text-white/30 flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                <CreditCard className="w-3.5 h-3.5 text-white/30 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-white/40 leading-relaxed">
-                  Você será redirecionado para o checkout seguro do AbacatePay. Aceitamos cartão de
-                  crédito com parcelamento em até 12x. Seu perfil é ativado automaticamente após a
-                  confirmação do pagamento.
+                  Você será redirecionado ao checkout seguro do AbacatePay. Aceitamos cartão de crédito
+                  com parcelamento em até 12x. Seu perfil é ativado automaticamente após a confirmação.
                 </p>
               </div>
 
@@ -669,7 +756,7 @@ export function CreateProfessionalModal({ onClose }: Props) {
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4" />
-                      Assinar — R$ 49,90/mês
+                      Assinar — {SUBSCRIPTION_PLANS.find((p) => p.key === form.plan_type)?.label}
                     </>
                   )}
                 </button>

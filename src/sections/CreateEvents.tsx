@@ -219,12 +219,12 @@ export function CreateEvents() {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center">
                 <Users className="w-7 h-7 text-[#00FF87] mx-auto mb-3" />
-                <div className="text-3xl font-extrabold text-white tracking-tight">15k+</div>
-                <div className="text-white/45 text-sm mt-1">atletas na plataforma</div>
+                <div className="text-3xl font-extrabold text-white tracking-tight">800+</div>
+                <div className="text-white/45 text-sm mt-1">trabalhadores atendidos</div>
               </div>
               <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center">
                 <Briefcase className="w-7 h-7 text-[#00FF87] mx-auto mb-3" />
-                <div className="text-3xl font-extrabold text-white tracking-tight">50+</div>
+                <div className="text-3xl font-extrabold text-white tracking-tight">10+</div>
                 <div className="text-white/45 text-sm mt-1">eventos realizados</div>
               </div>
               <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-center">

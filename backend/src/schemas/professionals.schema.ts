@@ -58,6 +58,7 @@ export const ProfessionalSubscribeSchema = z
     registration_number: z.string().min(1).max(50).trim(),
     registration_type: z.string().min(2).max(20).trim().toUpperCase(),
     bio: z.string().max(2000).trim().optional(),
+    plan_type: z.enum(["mensal", "trimestral", "semestral", "anual"]).default("mensal"),
     specialties: z
       .array(
         z.object({

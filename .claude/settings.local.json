@@ -14,7 +14,9 @@
       "Bash(npm audit:*)",
       "WebFetch(domain:www.abacatepay.com)",
       "Bash(npx tsc:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(xargs cat:*)",
+      "Bash(npx prisma:*)"
     ]
   }
 }

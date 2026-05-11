@@ -185,10 +185,10 @@ export function Companies() {
           {/* Right — métricas */}
           <div className="space-y-4">
             {[
-              { value: '15k+', label: 'Atletas alcançados por evento',    detail: 'Trabalhadores ativos na plataforma' },
-              { value: '8',    label: 'Cidades com presença ativa',       detail: 'Cobertura em expansão' },
-              { value: '98%',  label: 'Satisfação dos participantes',     detail: 'Avaliações pós-evento' },
-              { value: '50+',  label: 'Eventos realizados com sucesso',   detail: 'Histórico comprovado de execução' },
+              { value: '800+', label: 'Trabalhadores alcançados por evento', detail: 'Trabalhadores ativos na plataforma' },
+              { value: '8',    label: 'Cidades com presença ativa',        detail: 'Cobertura em expansão' },
+              { value: '98%',  label: 'Satisfação dos participantes',      detail: 'Avaliações pós-evento' },
+              { value: '10+',  label: 'Eventos realizados com sucesso',    detail: 'Histórico comprovado de execução' },
             ].map(metric => (
               <div key={metric.value} className="flex items-center gap-6 p-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-[#4169E1]/20 hover:bg-[#4169E1]/[0.04] transition-all duration-200 group">
                 <div className="flex-shrink-0 w-20 text-right">

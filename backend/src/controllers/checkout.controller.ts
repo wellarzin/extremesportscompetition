@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { sendSuccess, Errors } from "../lib/response";
 import { env } from "../lib/env";
 import * as abacatepay from "../lib/abacatepay";
+import { processStoreOrderConfirmation } from "./store.controller";
 
 const PAYMENT_TTL_SECONDS = 900; // 15 minutos
 
@@ -447,6 +448,7 @@ export async function abacatepayWebhook(
       (pixQrCodeData["id"] as string | undefined) ??
       (dataObj["id"] as string | undefined);
 
+    // Verifica primeiro se é pagamento de evento
     const payment = await prisma.payment.findFirst({
       where: {
         OR: [
@@ -456,15 +458,34 @@ export async function abacatepayWebhook(
       },
     });
 
-    if (!payment || payment.status !== "pending") {
+    if (payment && payment.status === "pending") {
+      try {
+        await processPaymentConfirmation(payment.id, request.log);
+      } catch (err) {
+        request.log.error(err, "Falha ao processar webhook PIX (evento)");
+        return reply.status(500).send({ error: "Internal error" });
+      }
       return reply.status(200).send({ received: true });
     }
 
-    try {
-      await processPaymentConfirmation(payment.id, request.log);
-    } catch (err) {
-      request.log.error(err, "Falha ao processar webhook PIX");
-      return reply.status(500).send({ error: "Internal error" });
+    // Verifica se é pedido da loja
+    const storeOrder = await prisma.storeOrder.findFirst({
+      where: {
+        OR: [
+          ...(externalId ? [{ id: externalId }] : []),
+          ...(abacatePayId ? [{ billing_id: abacatePayId }] : []),
+        ],
+        status: "pending_payment",
+      },
+    });
+
+    if (storeOrder) {
+      try {
+        await processStoreOrderConfirmation(storeOrder.id, request.log);
+      } catch (err) {
+        request.log.error(err, "Falha ao processar webhook PIX (loja)");
+        return reply.status(500).send({ error: "Internal error" });
+      }
     }
 
     return reply.status(200).send({ received: true });
@@ -481,11 +502,12 @@ export async function abacatepayWebhook(
         : dataObj
     ) as Record<string, unknown>;
 
-    const externalId = checkoutData["externalId"] as string | undefined; // nosso payment.id
+    const externalId = checkoutData["externalId"] as string | undefined; // nosso payment.id ou order.id
     const abacateCheckoutId = checkoutData["id"] as string | undefined;
 
     request.log.info({ externalId, abacateCheckoutId, hasCheckoutWrapper: !!dataObj.checkout }, "webhook checkout.completed recebido");
 
+    // Verifica primeiro se é pagamento de evento
     const payment = await prisma.payment.findFirst({
       where: {
         OR: [
@@ -495,15 +517,34 @@ export async function abacatepayWebhook(
       },
     });
 
-    if (!payment || payment.status !== "pending") {
+    if (payment && payment.status === "pending") {
+      try {
+        await processPaymentConfirmation(payment.id, request.log);
+      } catch (err) {
+        request.log.error(err, "Falha ao processar webhook cartão (evento)");
+        return reply.status(500).send({ error: "Internal error" });
+      }
       return reply.status(200).send({ received: true });
     }
 
-    try {
-      await processPaymentConfirmation(payment.id, request.log);
-    } catch (err) {
-      request.log.error(err, "Falha ao processar webhook cartão");
-      return reply.status(500).send({ error: "Internal error" });
+    // Verifica se é pedido da loja
+    const storeOrder = await prisma.storeOrder.findFirst({
+      where: {
+        OR: [
+          ...(externalId ? [{ id: externalId }] : []),
+          ...(abacateCheckoutId ? [{ billing_id: abacateCheckoutId }] : []),
+        ],
+        status: "pending_payment",
+      },
+    });
+
+    if (storeOrder) {
+      try {
+        await processStoreOrderConfirmation(storeOrder.id, request.log);
+      } catch (err) {
+        request.log.error(err, "Falha ao processar webhook cartão (loja)");
+        return reply.status(500).send({ error: "Internal error" });
+      }
     }
 
     return reply.status(200).send({ received: true });

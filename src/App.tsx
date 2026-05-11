@@ -8,6 +8,7 @@ import { Stats } from './sections/Stats';
 import { Events } from './sections/Events';
 import { Athletes } from './sections/Athletes';
 import { Rankings } from './sections/Rankings';
+import { Store } from './sections/Store';
 import { BrandsTicker } from './sections/BrandsTicker';
 import { Companies } from './sections/Companies';
 import { CreateEvents } from './sections/CreateEvents';
@@ -28,6 +29,7 @@ function LandingPage() {
       <Events />
       <Athletes />
       <Rankings />
+      <Store />
       <BrandsTicker />
       <Companies />
       <CreateEvents />
