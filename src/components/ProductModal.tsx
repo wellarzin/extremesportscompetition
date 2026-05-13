@@ -1,14 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, Plus, Minus, ShoppingCart, Package, Tag, Layers } from 'lucide-react';
 import type { StoreProduct } from '../types/api';
 import { mediaUrl } from '../lib/utils';
 
+const CLOTHING_SIZES = ['PP', 'P', 'M', 'G', 'GG', 'XGG'];
+
+interface CartEntry {
+  size?: string;
+  quantity: number;
+}
+
 interface Props {
   product: StoreProduct;
-  cartQuantity: number;
+  cartEntries: CartEntry[];
   onClose: () => void;
-  onAdd: () => void;
-  onRemove: () => void;
+  onAdd: (size?: string) => void;
+  onRemove: (size?: string) => void;
 }
 
 function formatPrice(cents: number): string {
@@ -23,8 +30,16 @@ const CATEGORY_LABEL: Record<string, string> = {
   outros:       'Outros',
 };
 
-export function ProductModal({ product, cartQuantity, onClose, onAdd, onRemove }: Props) {
+export function ProductModal({ product, cartEntries, onClose, onAdd, onRemove }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const isVestuario = product.category === 'vestuario';
+
+  // Pré-seleciona o tamanho se já houver exatamente um no carrinho
+  const [selectedSize, setSelectedSize] = useState<string | undefined>(() => {
+    if (!isVestuario) return undefined;
+    if (cartEntries.length === 1) return cartEntries[0].size;
+    return undefined;
+  });
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -33,6 +48,14 @@ export function ProductModal({ product, cartQuantity, onClose, onAdd, onRemove }
   }, [onClose]);
 
   const outOfStock = product.stock === 0;
+
+  // Quantidade no carrinho para o tamanho selecionado (ou produto sem tamanho)
+  const cartQuantity = isVestuario
+    ? (cartEntries.find(e => e.size === selectedSize)?.quantity ?? 0)
+    : (cartEntries.find(e => e.size === undefined)?.quantity ?? 0);
+
+  // Botão de adicionar só ativo se: não for vestuário OU tamanho selecionado
+  const canAdd = !isVestuario || !!selectedSize;
 
   return (
     <div
@@ -102,13 +125,49 @@ export function ProductModal({ product, cartQuantity, onClose, onAdd, onRemove }
 
             {/* Description */}
             {product.description && (
-              <p className="text-white/60 text-sm leading-relaxed mb-4 flex-1">
+              <p className="text-white/60 text-sm leading-relaxed mb-4">
                 {product.description}
               </p>
             )}
 
-            {/* Spacer when no description */}
-            {!product.description && <div className="flex-1" />}
+            {/* Seletor de tamanho (vestuário) */}
+            {isVestuario && !outOfStock && (
+              <div className="mb-5">
+                <p className="text-xs text-white/40 uppercase tracking-wider mb-2.5">
+                  Tamanho
+                  {!selectedSize && (
+                    <span className="ml-2 text-[#FF4D00]/80 normal-case tracking-normal">
+                      — selecione para continuar
+                    </span>
+                  )}
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  {CLOTHING_SIZES.map(size => {
+                    const sizeInCart = cartEntries.find(e => e.size === size);
+                    return (
+                      <button
+                        key={size}
+                        onClick={() => setSelectedSize(size)}
+                        className={`relative px-3.5 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
+                          selectedSize === size
+                            ? 'bg-[#00FF87] border-[#00FF87] text-[#0A0A0A]'
+                            : 'bg-white/5 border-white/10 text-white/60 hover:border-white/30 hover:text-white'
+                        }`}
+                      >
+                        {size}
+                        {/* Indicador de "já no carrinho" */}
+                        {sizeInCart && selectedSize !== size && (
+                          <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-[#00FF87] rounded-full border-2 border-[#111]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Spacer quando não há descrição nem tamanho */}
+            {!product.description && !isVestuario && <div className="flex-1" />}
 
             {/* Price */}
             <div className="mb-5">
@@ -125,16 +184,17 @@ export function ProductModal({ product, cartQuantity, onClose, onAdd, onRemove }
               </div>
             ) : cartQuantity === 0 ? (
               <button
-                onClick={onAdd}
-                className="w-full py-3.5 rounded-xl bg-[#00FF87] hover:bg-[#00cc6a] text-[#0A0A0A] font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                onClick={() => canAdd && onAdd(isVestuario ? selectedSize : undefined)}
+                disabled={!canAdd}
+                className="w-full py-3.5 rounded-xl bg-[#00FF87] hover:bg-[#00cc6a] text-[#0A0A0A] font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#00FF87]"
               >
                 <ShoppingCart className="w-4 h-4" />
-                Adicionar ao Carrinho
+                {isVestuario && !selectedSize ? 'Selecione um tamanho' : 'Adicionar ao Carrinho'}
               </button>
             ) : (
               <div className="flex items-center gap-3">
                 <button
-                  onClick={onRemove}
+                  onClick={() => onRemove(isVestuario ? selectedSize : undefined)}
                   aria-label="Remover um"
                   className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/8 hover:bg-white/15 border border-white/10 transition-colors"
                 >
@@ -147,7 +207,7 @@ export function ProductModal({ product, cartQuantity, onClose, onAdd, onRemove }
                 </div>
 
                 <button
-                  onClick={onAdd}
+                  onClick={() => onAdd(isVestuario ? selectedSize : undefined)}
                   disabled={cartQuantity >= product.stock}
                   aria-label="Adicionar um"
                   className="w-12 h-12 flex items-center justify-center rounded-xl bg-[#00FF87]/20 hover:bg-[#00FF87]/30 border border-[#00FF87]/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -160,6 +220,11 @@ export function ProductModal({ product, cartQuantity, onClose, onAdd, onRemove }
             {cartQuantity > 0 && (
               <p className="text-center text-xs text-[#00FF87]/60 mt-2">
                 Subtotal: {formatPrice(product.price_cents * cartQuantity)}
+                {selectedSize && (
+                  <span className="ml-1.5 px-1.5 py-0.5 bg-[#00FF87]/10 text-[#00FF87] rounded text-[10px] font-semibold">
+                    {selectedSize}
+                  </span>
+                )}
               </p>
             )}
           </div>

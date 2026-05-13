@@ -730,7 +730,7 @@ export interface FooterConfig {
 export const footerConfig: FooterConfig = {
   logoText: "EXTREME SPORTS",
   contactLabel: "Contato",
-  email: "projetos@extremesportscompetition.com",
+  email: "suporte@extremesportscompetition.com",
   locationText: "Porto Alegre, RS - Brasil",
   navigationLabel: "Navegação",
   navLinks: [

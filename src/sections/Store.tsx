@@ -19,11 +19,16 @@ import type { StoreProduct } from '../types/api';
 
 gsap.registerPlugin(ScrollTrigger);
 
+// ---- Tamanhos de vestuário ----
+
+const CLOTHING_SIZES = ['PP', 'P', 'M', 'G', 'GG', 'XGG'];
+
 // ---- Tipos internos ----
 
 interface CartItem {
   product: StoreProduct;
   quantity: number;
+  size?: string; // apenas para categoria vestuario
 }
 
 type CheckoutStep =
@@ -57,6 +62,9 @@ export function Store() {
 
   // Produto selecionado para modal de detalhe
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
+
+  // Tamanhos selecionados por produto nos cards
+  const [selectedCardSizes, setSelectedCardSizes] = useState<Record<string, string>>({});
 
   // Carrinho
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -130,8 +138,6 @@ export function Store() {
   }, [products]);
 
   // ---- Polling de status ----
-  // Para PIX: poll em background sem sobrescrever a tela (usuário precisa ver o código)
-  // Para cartão: vai para step 'polling' (usuário já foi redirecionado)
   const startPolling = useCallback((orderId: string, method: 'pix' | 'credit_card') => {
     if (method === 'credit_card') {
       setCheckoutStep({ type: 'polling', orderId, method });
@@ -161,29 +167,30 @@ export function Store() {
   }, []);
 
   // ---- Carrinho ----
-  const addToCart = (product: StoreProduct) => {
+  const addToCart = (product: StoreProduct, size?: string) => {
     if (product.stock === 0) return;
     setCart(prev => {
-      const existing = prev.find(i => i.product.id === product.id);
+      const existing = prev.find(i => i.product.id === product.id && i.size === size);
       if (existing) {
         if (existing.quantity >= product.stock) return prev;
         return prev.map(i =>
-          i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i,
+          i.product.id === product.id && i.size === size
+            ? { ...i, quantity: i.quantity + 1 } : i,
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: 1, size }];
     });
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(i => i.product.id !== productId));
+  const removeFromCart = (productId: string, size?: string) => {
+    setCart(prev => prev.filter(i => !(i.product.id === productId && i.size === size)));
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const updateQuantity = (productId: string, size: string | undefined, delta: number) => {
     setCart(prev =>
       prev
         .map(i => {
-          if (i.product.id !== productId) return i;
+          if (i.product.id !== productId || i.size !== size) return i;
           const max = i.product.stock;
           const newQty = Math.min(max, Math.max(0, i.quantity + delta));
           return { ...i, quantity: newQty };
@@ -320,7 +327,11 @@ export function Store() {
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6"
           >
             {products.map(product => {
-              const inCart = cart.find(i => i.product.id === product.id);
+              const isVestuario = product.category === 'vestuario';
+              const cardSize = selectedCardSizes[product.id];
+              const inCart = isVestuario
+                ? (cardSize ? cart.find(i => i.product.id === product.id && i.size === cardSize) : undefined)
+                : cart.find(i => i.product.id === product.id && i.size === undefined);
               const outOfStock = product.stock === 0;
 
               return (
@@ -353,7 +364,14 @@ export function Store() {
 
                     {!outOfStock && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isVestuario) {
+                            setSelectedProduct(product);
+                          } else {
+                            addToCart(product);
+                          }
+                        }}
                         aria-label={`Adicionar ${product.name} ao carrinho`}
                         className="absolute bottom-3 right-3 w-10 h-10 bg-[#00FF87] hover:bg-[#00cc6a] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0"
                       >
@@ -378,10 +396,35 @@ export function Store() {
                       {formatPrice(product.price_cents)}
                     </div>
 
+                    {/* Seletor de tamanho (vestuário) */}
+                    {isVestuario && !outOfStock && (
+                      <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+                        <p className="text-white/30 text-[10px] uppercase tracking-wider mb-1.5">Tamanho</p>
+                        <div className="flex flex-wrap gap-1">
+                          {CLOTHING_SIZES.map(size => (
+                            <button
+                              key={size}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCardSizes(prev => ({ ...prev, [product.id]: size }));
+                              }}
+                              className={`px-2 py-0.5 rounded text-[10px] font-semibold border transition-all ${
+                                cardSize === size
+                                  ? 'bg-[#00FF87] border-[#00FF87] text-[#0A0A0A]'
+                                  : 'bg-white/5 border-white/10 text-white/50 hover:border-white/30 hover:text-white/80'
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {inCart ? (
                       <div className="flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => updateQuantity(product.id, -1)}
+                          onClick={() => updateQuantity(product.id, isVestuario ? cardSize : undefined, -1)}
                           aria-label="Remover um"
                           className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition-colors"
                         >
@@ -389,7 +432,7 @@ export function Store() {
                         </button>
                         <span className="text-white font-semibold text-sm">{inCart.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(product.id, 1)}
+                          onClick={() => updateQuantity(product.id, isVestuario ? cardSize : undefined, 1)}
                           disabled={inCart.quantity >= product.stock}
                           aria-label="Adicionar um"
                           className="w-8 h-8 bg-[#00FF87]/20 hover:bg-[#00FF87]/30 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -399,12 +442,23 @@ export function Store() {
                       </div>
                     ) : (
                       <button
-                        onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isVestuario && !cardSize) {
+                            setSelectedProduct(product);
+                            return;
+                          }
+                          addToCart(product, isVestuario ? cardSize : undefined);
+                        }}
                         disabled={outOfStock}
                         className="w-full py-2 bg-white/5 hover:bg-[#00FF87]/10 hover:border-[#00FF87]/30 border border-white/10 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <ShoppingCart className="w-4 h-4" />
-                        {outOfStock ? 'Indisponível' : 'Adicionar'}
+                        {outOfStock
+                          ? 'Indisponível'
+                          : isVestuario && !cardSize
+                          ? 'Selecione o tamanho'
+                          : 'Adicionar'}
                       </button>
                     )}
                   </div>
@@ -455,7 +509,7 @@ export function Store() {
               ) : (
                 <div className="space-y-3">
                   {cart.map(item => (
-                    <div key={item.product.id} className="flex gap-4 p-4 bg-white/5 rounded-xl">
+                    <div key={`${item.product.id}-${item.size ?? ''}`} className="flex gap-4 p-4 bg-white/5 rounded-xl">
                       <div className="w-20 h-20 rounded-lg overflow-hidden bg-[#1a1a1a] shrink-0">
                         {item.product.image_url ? (
                           <img
@@ -473,13 +527,18 @@ export function Store() {
                         <h4 className="text-white font-medium text-sm leading-snug line-clamp-2">
                           {item.product.name}
                         </h4>
+                        {item.size && (
+                          <span className="inline-block mt-1 px-2 py-0.5 bg-[#00FF87]/10 border border-[#00FF87]/20 text-[#00FF87] text-[10px] font-semibold rounded uppercase tracking-wider">
+                            {item.size}
+                          </span>
+                        )}
                         <p className="text-[#00FF87] font-semibold mt-1 text-sm">
                           {formatPrice(item.product.price_cents)}
                         </p>
                       </div>
                       <div className="flex flex-col items-end justify-between shrink-0">
                         <button
-                          onClick={() => removeFromCart(item.product.id)}
+                          onClick={() => removeFromCart(item.product.id, item.size)}
                           aria-label="Remover item"
                           className="text-white/30 hover:text-[#FF4D00] transition-colors"
                         >
@@ -487,7 +546,7 @@ export function Store() {
                         </button>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.product.id, -1)}
+                            onClick={() => updateQuantity(item.product.id, item.size, -1)}
                             className="w-6 h-6 bg-white/10 rounded flex items-center justify-center hover:bg-white/20 transition-colors"
                           >
                             <Minus className="w-3 h-3 text-white" />
@@ -496,7 +555,7 @@ export function Store() {
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() => updateQuantity(item.product.id, 1)}
+                            onClick={() => updateQuantity(item.product.id, item.size, 1)}
                             disabled={item.quantity >= item.product.stock}
                             className="w-6 h-6 bg-white/10 rounded flex items-center justify-center hover:bg-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           >
@@ -614,7 +673,6 @@ export function Store() {
                   <p className="text-[#00FF87] font-semibold">{formatPrice(cartTotal)}</p>
                 </div>
 
-                {/* QR Code image */}
                 {checkoutStep.pixQrCode && (
                   <div className="flex justify-center mb-5">
                     <div className="p-3 bg-white rounded-xl">
@@ -741,10 +799,12 @@ export function Store() {
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}
-          cartQuantity={cart.find(i => i.product.id === selectedProduct.id)?.quantity ?? 0}
+          cartEntries={cart
+            .filter(i => i.product.id === selectedProduct.id)
+            .map(i => ({ size: i.size, quantity: i.quantity }))}
           onClose={() => setSelectedProduct(null)}
-          onAdd={() => addToCart(selectedProduct)}
-          onRemove={() => updateQuantity(selectedProduct.id, -1)}
+          onAdd={(size) => addToCart(selectedProduct, size)}
+          onRemove={(size) => updateQuantity(selectedProduct.id, size, -1)}
         />
       )}
     </section>
