@@ -33,29 +33,31 @@ function detectMime(buf: Buffer): string | null {
 // Todos usam ciclo MONTHLY — o AbacatePay cobra mensalmente o valor abaixo.
 // Semestral = R$81,69/mês × 6 = R$490,14 total (5% off)
 // Anual     = R$77,39/mês × 12 = R$928,68 total (~10% off)
+// IDs versionados por preço — bumpar o sufixo sempre que o amountCents mudar,
+// pois o AbacatePay não atualiza o preço de produtos existentes.
 const PLANS = {
   mensal: {
     amountCents: 8599,             // R$85,99/mês
     abacateCycle: "MONTHLY" as const,
-    externalId: "professional_plan_mensal_v1",
+    externalId: "professional_plan_mensal_8599",
     name: "Assinatura Profissional — Mensal",
   },
   trimestral: {
-    amountCents: 8599,             // R$85,99/mês (mesma taxa, compromisso 3 meses)
+    amountCents: 8599,             // R$85,99/mês (compromisso 3 meses)
     abacateCycle: "MONTHLY" as const,
-    externalId: "professional_plan_trimestral_v1",
+    externalId: "professional_plan_trimestral_8599",
     name: "Assinatura Profissional — Trimestral",
   },
   semestral: {
     amountCents: 8169,             // R$81,69/mês → R$490,14 em 6 meses
     abacateCycle: "MONTHLY" as const,
-    externalId: "professional_plan_semestral_v2",
+    externalId: "professional_plan_semestral_8169",
     name: "Assinatura Profissional — Semestral",
   },
   anual: {
     amountCents: 7739,             // R$77,39/mês → R$928,68 em 12 meses
     abacateCycle: "MONTHLY" as const,
-    externalId: "professional_plan_anual_v2",
+    externalId: "professional_plan_anual_7739",
     name: "Assinatura Profissional — Anual",
   },
 } as const;
