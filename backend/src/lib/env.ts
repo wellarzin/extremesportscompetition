@@ -38,6 +38,14 @@ const envSchema = z.object({
   SWAGGER_USER: z.string().optional(),
   SWAGGER_PASS: z.string().optional(),
 
+  // Object storage — Supabase Storage (S3-compatible)
+  STORAGE_ENDPOINT: z.string().url(),
+  STORAGE_REGION: z.string().default("us-east-1"),
+  STORAGE_ACCESS_KEY_ID: z.string().min(1),
+  STORAGE_SECRET_ACCESS_KEY: z.string().min(1),
+  STORAGE_BUCKET: z.string().min(1),
+  STORAGE_PUBLIC_URL: z.string().url(),
+
   // E-mail (Resend)
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("noreply@extremesportscompetition.com"),

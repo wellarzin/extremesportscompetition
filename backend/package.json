@@ -18,6 +18,7 @@
     "create:admin": "node --env-file=.env scripts/create-admin.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1047.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",

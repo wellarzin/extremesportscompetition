@@ -1,12 +1,11 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { randomUUID } from "crypto";
-import { createWriteStream, mkdirSync } from "fs";
-import { join } from "path";
 import { prisma } from "../lib/prisma";
 import { sendSuccess, Errors } from "../lib/response";
 import { env } from "../lib/env";
 import * as abacatepay from "../lib/abacatepay";
 import { activateProfessionalSubscription } from "./checkout.controller";
+import { uploadFile } from "../lib/storage";
 import type {
   CreateProfessionalInput,
   UpdateProfessionalInput,
@@ -14,8 +13,6 @@ import type {
   ListProfessionalsQueryInput,
   ProfessionalSubscribeInput,
 } from "../schemas/professionals.schema";
-
-const PHOTOS_DIR = join(process.cwd(), "uploads", "professionals");
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -291,23 +288,7 @@ export async function uploadSubscriptionPhoto(
   const ext = ALLOWED_MIME[mime];
   const filename = `${randomUUID()}${ext}`;
 
-  try {
-    mkdirSync(PHOTOS_DIR, { recursive: true });
-  } catch {
-    return Errors.internal(reply);
-  }
-
-  const filePath = join(PHOTOS_DIR, filename);
-  const ws = createWriteStream(filePath);
-  ws.write(fullBuffer);
-  ws.end();
-
-  await new Promise<void>((resolve, reject) => {
-    ws.on("finish", resolve);
-    ws.on("error", reject);
-  });
-
-  const photo_url = `/uploads/professionals/${filename}`;
+  const photo_url = await uploadFile("professionals", filename, fullBuffer, mime);
 
   await prisma.professionalSubscription.update({
     where: { id: subscription.id },
@@ -752,23 +733,7 @@ export async function uploadProfessionalPhoto(
   const ext = ALLOWED_MIME[mime];
   const filename = `${randomUUID()}${ext}`;
 
-  try {
-    mkdirSync(PHOTOS_DIR, { recursive: true });
-  } catch {
-    return Errors.internal(reply);
-  }
-
-  const filePath = join(PHOTOS_DIR, filename);
-  const ws = createWriteStream(filePath);
-  ws.write(fullBuffer);
-  ws.end();
-
-  await new Promise<void>((resolve, reject) => {
-    ws.on("finish", resolve);
-    ws.on("error", reject);
-  });
-
-  const photo_url = `/uploads/professionals/${filename}`;
+  const photo_url = await uploadFile("professionals", filename, fullBuffer, mime);
 
   await prisma.professional.update({
     where: { id },

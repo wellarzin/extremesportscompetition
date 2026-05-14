@@ -1,18 +1,15 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { randomUUID } from "crypto";
-import { createWriteStream, mkdirSync } from "fs";
-import { join } from "path";
 import { prisma } from "../lib/prisma";
 import { sendSuccess, Errors } from "../lib/response";
 import { sanitizeHtml } from "../lib/sanitize";
+import { uploadFile } from "../lib/storage";
 import type {
   CreateEventInput,
   UpdateEventInput,
   ListEventsQueryInput,
 } from "../schemas/events.schema";
 
-const COVERS_DIR = join(process.cwd(), "uploads", "covers");
-const RULES_PDF_DIR = join(process.cwd(), "uploads", "rules");
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -81,23 +78,7 @@ export async function uploadEventCover(
   const ext = ALLOWED_MIME[mime];
   const filename = `${randomUUID()}${ext}`;
 
-  try {
-    mkdirSync(COVERS_DIR, { recursive: true });
-  } catch {
-    return Errors.internal(reply);
-  }
-
-  const filePath = join(COVERS_DIR, filename);
-  const ws = createWriteStream(filePath);
-  ws.write(fullBuffer);
-  ws.end();
-
-  await new Promise<void>((resolve, reject) => {
-    ws.on("finish", resolve);
-    ws.on("error", reject);
-  });
-
-  const cover_image_url = `/uploads/covers/${filename}`;
+  const cover_image_url = await uploadFile("covers", filename, fullBuffer, mime);
 
   await prisma.event.update({
     where: { id },
@@ -603,23 +584,7 @@ export async function uploadEventRulesPdf(
 
   const filename = `${randomUUID()}.pdf`;
 
-  try {
-    mkdirSync(RULES_PDF_DIR, { recursive: true });
-  } catch {
-    return Errors.internal(reply);
-  }
-
-  const filePath = join(RULES_PDF_DIR, filename);
-  const ws = createWriteStream(filePath);
-  ws.write(fullBuffer);
-  ws.end();
-
-  await new Promise<void>((resolve, reject) => {
-    ws.on("finish", resolve);
-    ws.on("error", reject);
-  });
-
-  const rules_file_url = `/uploads/rules/${filename}`;
+  const rules_file_url = await uploadFile("rules", filename, fullBuffer, "application/pdf");
 
   await prisma.event.update({
     where: { id },

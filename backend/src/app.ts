@@ -6,8 +6,6 @@ import rateLimit from "@fastify/rate-limit";
 import cookie from "@fastify/cookie";
 import swagger from "@fastify/swagger";
 import multipart from "@fastify/multipart";
-import staticFiles from "@fastify/static";
-import { join } from "path";
 import { env } from "./lib/env";
 import { authRoutes } from "./routes/auth";
 import { usersRoutes } from "./routes/users";
@@ -215,16 +213,7 @@ Marketplace de eventos esportivos — maratonas, campeonatos e desafios.
   // ---- Cookie ----
   await app.register(cookie);
 
-  // ---- Arquivos estáticos — uploads de imagens ----
-  // Serve todo o diretório uploads/ (avatars, covers, professionals)
-  // Nunca expõe o restante do filesystem
-  await app.register(staticFiles, {
-    root: join(process.cwd(), "uploads"),
-    prefix: "/uploads/",
-    decorateReply: false,
-  });
-
-  // ---- Multipart — upload de avatars (limite: 5 MB) ----
+  // ---- Multipart — upload de arquivos (limite: 5 MB padrão, sobrescrito por rota) ----
   await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } });
 
   // ---- Rate Limiting global (60 req/min por IP) ----

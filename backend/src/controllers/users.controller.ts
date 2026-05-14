@@ -1,12 +1,10 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
-import { createWriteStream, mkdirSync } from "fs";
-import { join } from "path";
-import { pipeline } from "stream/promises";
 import { prisma } from "../lib/prisma";
 import { sendSuccess, Errors } from "../lib/response";
 import { decrypt, maskDocument } from "../lib/crypto";
+import { uploadFile } from "../lib/storage";
 import type {
   UpdateProfileInput,
   ChangeEmailInput,
@@ -18,8 +16,6 @@ import type {
 
 const BCRYPT_ROUNDS = 12;
 const MAX_SPORT_PREFERENCES = 5;
-const UPLOADS_DIR = join(process.cwd(), "uploads", "avatars");
-const DELIVERY_PROOFS_DIR = join(process.cwd(), "uploads", "delivery-proofs");
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -252,23 +248,7 @@ export async function uploadAvatar(request: FastifyRequest, reply: FastifyReply)
   const ext = ALLOWED_MIME[mime];
   const filename = `${randomUUID()}${ext}`;
 
-  try {
-    mkdirSync(UPLOADS_DIR, { recursive: true });
-  } catch {
-    return Errors.internal(reply);
-  }
-
-  const filePath = join(UPLOADS_DIR, filename);
-  const ws = createWriteStream(filePath);
-  ws.write(fullBuffer);
-  ws.end();
-
-  await new Promise<void>((resolve, reject) => {
-    ws.on("finish", resolve);
-    ws.on("error", reject);
-  });
-
-  const photo_url = `/uploads/avatars/${filename}`;
+  const photo_url = await uploadFile("avatars", filename, fullBuffer, mime);
 
   await prisma.user.update({
     where: { id: userId },
@@ -318,23 +298,7 @@ export async function uploadDeliveryProof(request: FastifyRequest, reply: Fastif
   const ext = ALLOWED_MIME[mime];
   const filename = `${randomUUID()}${ext}`;
 
-  try {
-    mkdirSync(DELIVERY_PROOFS_DIR, { recursive: true });
-  } catch {
-    return Errors.internal(reply);
-  }
-
-  const filePath = join(DELIVERY_PROOFS_DIR, filename);
-  const ws = createWriteStream(filePath);
-  ws.write(fullBuffer);
-  ws.end();
-
-  await new Promise<void>((resolve, reject) => {
-    ws.on("finish", resolve);
-    ws.on("error", reject);
-  });
-
-  const delivery_proof_url = `/uploads/delivery-proofs/${filename}`;
+  const delivery_proof_url = await uploadFile("delivery-proofs", filename, fullBuffer, mime);
 
   await prisma.user.update({
     where: { id: userId },
