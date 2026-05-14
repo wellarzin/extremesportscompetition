@@ -33,31 +33,25 @@ function detectMime(buf: Buffer): string | null {
 // Todos usam ciclo MONTHLY — o AbacatePay cobra mensalmente o valor abaixo.
 // Semestral = R$81,69/mês × 6 = R$490,14 total (5% off)
 // Anual     = R$77,39/mês × 12 = R$928,68 total (~10% off)
-// IDs versionados por preço — bumpar o sufixo sempre que o amountCents mudar,
-// pois o AbacatePay não atualiza o preço de produtos existentes.
 const PLANS = {
   mensal: {
     amountCents: 8599,             // R$85,99/mês
-    abacateCycle: "MONTHLY" as const,
-    externalId: "professional_plan_mensal_8599",
+    productId: "prod_p4ZyCPcSgpkkCaKeLS55QG4p",
     name: "Assinatura Profissional — Mensal",
   },
   trimestral: {
     amountCents: 8599,             // R$85,99/mês (compromisso 3 meses)
-    abacateCycle: "MONTHLY" as const,
-    externalId: "professional_plan_trimestral_8599",
+    productId: "prod_ahhMqSTBwThx3a2geJB1CfPa",
     name: "Assinatura Profissional — Trimestral",
   },
   semestral: {
     amountCents: 8169,             // R$81,69/mês → R$490,14 em 6 meses
-    abacateCycle: "MONTHLY" as const,
-    externalId: "professional_plan_semestral_8169",
+    productId: "prod_CBAyzHgkEFXUur3SLRrBUCRT",
     name: "Assinatura Profissional — Semestral",
   },
   anual: {
     amountCents: 7739,             // R$77,39/mês → R$928,68 em 12 meses
-    abacateCycle: "MONTHLY" as const,
-    externalId: "professional_plan_anual_7739",
+    productId: "prod_Acygks4XWuhzbBtZa3bFxMEE",
     name: "Assinatura Profissional — Anual",
   },
 } as const;
@@ -184,22 +178,8 @@ export async function subscribeProfessional(
     });
   }
 
-  // ---- 4. Localiza ou cria produto de assinatura no AbacatePay ----
-  let productId: string;
-  try {
-    productId = await abacatepay.findOrCreateSubscriptionProduct(
-      env.ABACATEPAY_API_KEY,
-      env.ABACATEPAY_BASE_URL,
-      plan.externalId,
-      plan.name,
-      plan.amountCents,
-      plan.abacateCycle,
-    );
-  } catch (err) {
-    await prisma.professionalSubscription.delete({ where: { id: subscription.id } }).catch(() => {});
-    request.log.error(err, "AbacatePay: falha ao criar/localizar produto de assinatura");
-    return Errors.internal(reply);
-  }
+  // ---- 4. Produto fixo do AbacatePay — ID já conhecido por plano ----
+  const productId = plan.productId;
 
   // ---- 5. Cria checkout de assinatura ----
   let checkout: abacatepay.AbacateSubscriptionCheckout;
