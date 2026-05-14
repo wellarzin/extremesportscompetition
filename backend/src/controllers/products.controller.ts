@@ -1,12 +1,10 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { randomUUID } from "crypto";
-import { createWriteStream, mkdirSync } from "fs";
-import { join } from "path";
 import { prisma } from "../lib/prisma";
 import { sendSuccess, Errors } from "../lib/response";
+import { uploadFile } from "../lib/storage";
 import { ProductCategory } from "@prisma/client";
 
-const IMAGES_DIR = join(process.cwd(), "uploads", "products");
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png":  ".png",
@@ -206,19 +204,7 @@ export async function uploadProductImage(
   const ext      = ALLOWED_MIME[mime];
   const filename = `${randomUUID()}${ext}`;
 
-  try { mkdirSync(IMAGES_DIR, { recursive: true }); } catch { return Errors.internal(reply); }
-
-  const filePath = join(IMAGES_DIR, filename);
-  const ws       = createWriteStream(filePath);
-  ws.write(fullBuffer);
-  ws.end();
-
-  await new Promise<void>((resolve, reject) => {
-    ws.on("finish", resolve);
-    ws.on("error", reject);
-  });
-
-  const image_url = `/uploads/products/${filename}`;
+  const image_url = await uploadFile("products", filename, fullBuffer, mime);
 
   await prisma.product.update({ where: { id }, data: { image_url } });
 
