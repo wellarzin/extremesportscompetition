@@ -379,6 +379,7 @@ export async function landingRoutes(app: FastifyInstance) {
                 cover_image_url: { type: "string", nullable: true },
                 ranking_points: { type: "integer", nullable: true },
                 reward: { type: "string" },
+                note: { type: "string", nullable: true },
                 created_at: { type: "string", format: "date-time" },
                 organizer: {
                   type: "object",
@@ -419,6 +420,7 @@ export async function landingRoutes(app: FastifyInstance) {
           cover_image_url: true,
           ranking_points: true,
           reward: true,
+          note: true,
           created_at: true,
           // Nunca expor dados privados do organizador além de id e full_name
           organizer: { select: { id: true, full_name: true } },

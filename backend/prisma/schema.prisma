@@ -460,6 +460,7 @@ model Event {
   ranking_points  Int?
   reward          String        @default("A definir")
   rules_file_url  String?
+  note            String?       @db.Text
   created_at      DateTime      @default(now())
   updated_at      DateTime      @updatedAt
   deleted_at      DateTime?

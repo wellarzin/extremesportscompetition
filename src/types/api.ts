@@ -55,6 +55,7 @@ export interface LandingEventDetail extends LandingEvent {
   description: string;
   rules: string | null;
   rules_file_url: string | null;
+  note: string | null;
   created_at: string;
 }
 

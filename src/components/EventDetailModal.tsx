@@ -654,6 +654,17 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
                     <p className="text-white font-medium">{modalityLabel(detail.modality)}</p>
                   </div>
 
+                  {/* Observação especial do evento */}
+                  {detail.note && (
+                    <div className="p-4 bg-[#FF6B00]/10 border border-[#FF6B00]/30 rounded-xl flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-[#FF6B00] flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-[#FF6B00] uppercase tracking-wider mb-1">Atenção</p>
+                        <p className="text-white/80 text-sm leading-relaxed">{detail.note}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Checkout area — state-driven */}
                   {renderSidebarCheckout()}
 
