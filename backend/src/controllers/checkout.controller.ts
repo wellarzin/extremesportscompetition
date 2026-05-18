@@ -76,17 +76,36 @@ export async function activateProfessionalSubscription(
 
 // ---- helper compartilhado: cria ticket atomicamente ----
 // Usado tanto pelo polling quanto pelo webhook para evitar duplicação
+// Detecta automaticamente se é compra individual ou por equipe.
 
 export async function processPaymentConfirmation(paymentId: string, log: { info: (...a: unknown[]) => void; error: (...a: unknown[]) => void }): Promise<string | null> {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
-    include: { event: { select: { id: true, capacity: true, enrolled: true } } },
+    include: {
+      event: { select: { id: true, capacity: true, enrolled: true } },
+      team_purchase: {
+        select: {
+          id: true,
+          member_emails: true,
+          member_count: true,
+          uses_platform_professional: true,
+          external_cref: true,
+        },
+      },
+    },
   });
 
   if (!payment || payment.status !== "pending") {
     return payment?.ticket_id ?? null;
   }
 
+  // ---- Compra por equipe ----
+  if (payment.team_purchase) {
+    await processTeamPaymentConfirmation(payment as typeof payment & { team_purchase: NonNullable<typeof payment.team_purchase> }, log);
+    return null;
+  }
+
+  // ---- Compra individual ----
   let ticketId: string | null = null;
 
   await prisma.$transaction(async (tx) => {
@@ -105,6 +124,13 @@ export async function processPaymentConfirmation(paymentId: string, log: { info:
         user_id: payment.user_id,
         price_paid_cents: payment.amount,
         status: "ativo",
+        // Propaga escolha de profissional armazenada no Payment
+        ...(payment.prof_uses_platform !== null && payment.prof_uses_platform !== undefined
+          ? {
+              uses_platform_professional: payment.prof_uses_platform,
+              external_cref: payment.prof_external_cref ?? null,
+            }
+          : {}),
       },
     });
 
@@ -132,14 +158,114 @@ export async function processPaymentConfirmation(paymentId: string, log: { info:
   return ticketId;
 }
 
+// ---- helper: processa pagamento de equipe atomicamente ----
+
+async function processTeamPaymentConfirmation(
+  payment: {
+    id: string;
+    event_id: string;
+    amount: number;
+    event: { id: string; capacity: number | null; enrolled: number };
+    team_purchase: {
+      id: string;
+      member_emails: string[];
+      member_count: number;
+      uses_platform_professional: boolean | null;
+      external_cref: string | null;
+    };
+  },
+  log: { info: (...a: unknown[]) => void; error: (...a: unknown[]) => void },
+): Promise<void> {
+  const { team_purchase } = payment;
+
+  await prisma.$transaction(async (tx) => {
+    // Re-verifica dentro da transação para evitar duplicação
+    const fresh = await tx.payment.findUnique({
+      where: { id: payment.id },
+      select: { status: true },
+    });
+    if (fresh?.status !== "pending") return;
+
+    // Busca usuários pelos e-mails dos membros
+    const members = await tx.user.findMany({
+      where: { email: { in: team_purchase.member_emails }, deleted_at: null },
+      select: { id: true, email: true },
+    });
+
+    if (members.length === 0) {
+      log.error({ teamPurchaseId: team_purchase.id }, "Nenhum membro encontrado para criação de tickets de equipe");
+      return;
+    }
+
+    const pricePerMember = Math.round(payment.amount / team_purchase.member_count);
+
+    // Escolha de profissional herdada do TeamPurchase
+    const profFields =
+      team_purchase.uses_platform_professional !== null &&
+      team_purchase.uses_platform_professional !== undefined
+        ? {
+            uses_platform_professional: team_purchase.uses_platform_professional,
+            external_cref: team_purchase.external_cref ?? null,
+          }
+        : {};
+
+    // Cria um ticket por membro encontrado
+    for (const member of members) {
+      await tx.ticket.create({
+        data: {
+          event_id: payment.event_id,
+          user_id: member.id,
+          price_paid_cents: pricePerMember,
+          status: "ativo",
+          team_purchase_id: team_purchase.id,
+          ...profFields,
+        },
+      });
+    }
+
+    const actualCount = members.length;
+    const newEnrolled = payment.event.enrolled + actualCount;
+    const reachedCapacity =
+      payment.event.capacity !== null && newEnrolled >= payment.event.capacity;
+
+    await tx.event.update({
+      where: { id: payment.event_id },
+      data: {
+        enrolled: { increment: actualCount },
+        ...(reachedCapacity ? { status: "esgotado" } : {}),
+      },
+    });
+
+    await tx.teamPurchase.update({
+      where: { id: team_purchase.id },
+      data: { status: "paid" },
+    });
+
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: "paid" },
+    });
+  });
+
+  log.info({ teamPurchaseId: team_purchase.id, paymentId: payment.id }, "Pagamento de equipe processado com sucesso");
+}
+
 // ============================================================
 // POST /api/v1/checkout/events/:id
 // ============================================================
 
 type PaymentMethod = "pix" | "credit_card";
 
+interface ProfessionalChoiceBody {
+  uses_platform_professional?: boolean;
+  external_cref?: string;
+}
+
 export async function initiateCheckout(
-  request: FastifyRequest<{ Params: { id: string }; Body: { method: PaymentMethod } }>,
+  request: FastifyRequest<{
+    Params: { id: string };
+    Body: { method: PaymentMethod } & ProfessionalChoiceBody;
+  }>,
   reply: FastifyReply,
 ) {
   if (!env.ABACATEPAY_API_KEY) {
@@ -152,11 +278,21 @@ export async function initiateCheckout(
   const userId = request.user.sub;
   const eventId = request.params.id;
   const method: PaymentMethod = request.body?.method ?? "pix";
+  const usesPlatform = request.body?.uses_platform_professional;
+  const externalCref = request.body?.external_cref?.trim() ?? null;
 
   // ---- 1. Busca evento ----
   const event = await prisma.event.findUnique({
     where: { id: eventId, deleted_at: null },
-    select: { id: true, title: true, price_cents: true, status: true, capacity: true, enrolled: true },
+    select: {
+      id: true,
+      title: true,
+      price_cents: true,
+      status: true,
+      capacity: true,
+      enrolled: true,
+      requires_professional_choice: true,
+    },
   });
 
   if (!event) return Errors.notFound(reply, "Evento");
@@ -166,6 +302,20 @@ export async function initiateCheckout(
     return Errors.validation(reply, [{ message: "Eventos gratuitos não requerem checkout." }]);
   if (event.capacity !== null && event.enrolled >= event.capacity)
     return Errors.conflict(reply, "Evento esgotado.");
+
+  // ---- 1b. Valida escolha de profissional (quando exigida pelo evento) ----
+  if (event.requires_professional_choice) {
+    if (usesPlatform === undefined || usesPlatform === null) {
+      return Errors.validation(reply, [{
+        message: "Informe se você utilizará profissionais cadastrados na plataforma (uses_platform_professional: true/false).",
+      }]);
+    }
+    if (usesPlatform === false && (!externalCref || externalCref.length < 5)) {
+      return Errors.validation(reply, [{
+        message: "Informe o CREF do profissional que você vai utilizar (external_cref).",
+      }]);
+    }
+  }
 
   // ---- 2. Verifica ticket existente ----
   const existingTicket = await prisma.ticket.findFirst({
@@ -206,6 +356,13 @@ export async function initiateCheckout(
       method,
       status: "pending",
       expires_at: expiresAt,
+      // Armazena escolha de profissional para ser propagada ao Ticket na confirmação
+      ...(event.requires_professional_choice && usesPlatform !== undefined
+        ? {
+            prof_uses_platform: usesPlatform,
+            prof_external_cref: usesPlatform ? null : externalCref,
+          }
+        : {}),
     },
   });
 
@@ -306,6 +463,307 @@ export async function initiateCheckout(
       checkout_url: checkout.url,
       amount_cents: event.price_cents,
       expires_at: expiresAt.toISOString(),
+    }, 201);
+  }
+
+  return Errors.validation(reply, [{ message: "Método de pagamento inválido." }]);
+}
+
+// ============================================================
+// POST /api/v1/checkout/events/:id/team
+// Compra de ingressos para equipe inteira
+// ============================================================
+
+export async function initiateTeamCheckout(
+  request: FastifyRequest<{
+    Params: { id: string };
+    Body: { method: PaymentMethod; member_emails: string[] } & ProfessionalChoiceBody;
+  }>,
+  reply: FastifyReply,
+) {
+  if (!env.ABACATEPAY_API_KEY) {
+    return reply.status(503).send({
+      success: false,
+      error: { code: "PAYMENT_UNAVAILABLE", message: "Gateway de pagamento não configurado. Contate o suporte." },
+    });
+  }
+
+  const userId = request.user.sub;
+  const eventId = request.params.id;
+  const method: PaymentMethod = request.body?.method ?? "pix";
+  const rawEmails: string[] = request.body?.member_emails ?? [];
+  const usesPlatform = request.body?.uses_platform_professional;
+  const externalCref = request.body?.external_cref?.trim() ?? null;
+
+  // ---- 1. Validação básica dos e-mails ----
+  if (!Array.isArray(rawEmails) || rawEmails.length < 2) {
+    return Errors.validation(reply, [{ message: "Informe pelo menos 2 e-mails de membros da equipe." }]);
+  }
+  if (rawEmails.length > 50) {
+    return Errors.validation(reply, [{ message: "Máximo de 50 membros por equipe." }]);
+  }
+
+  const memberEmails = [...new Set(rawEmails.map((e) => e.toLowerCase().trim()))];
+  const invalidEmails = memberEmails.filter((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  if (invalidEmails.length > 0) {
+    return Errors.validation(reply, [{ message: `E-mails inválidos: ${invalidEmails.join(", ")}` }]);
+  }
+
+  // ---- 2. Busca evento ----
+  const event = await prisma.event.findUnique({
+    where: { id: eventId, deleted_at: null },
+    select: {
+      id: true,
+      title: true,
+      price_cents: true,
+      status: true,
+      capacity: true,
+      enrolled: true,
+      allow_team_purchase: true,
+      requires_professional_choice: true,
+    },
+  });
+
+  if (!event) return Errors.notFound(reply, "Evento");
+  if (!event.allow_team_purchase)
+    return Errors.validation(reply, [{ message: "Este evento não permite compra por equipe." }]);
+  if (event.status !== "aberto")
+    return Errors.conflict(reply, "Inscrições não estão abertas para este evento.");
+  if (event.price_cents === 0)
+    return Errors.validation(reply, [{ message: "Eventos gratuitos não requerem checkout." }]);
+
+  // ---- 2b. Valida escolha de profissional ----
+  if (event.requires_professional_choice) {
+    if (usesPlatform === undefined || usesPlatform === null) {
+      return Errors.validation(reply, [{
+        message: "Informe se você utilizará profissionais cadastrados na plataforma (uses_platform_professional: true/false).",
+      }]);
+    }
+    if (usesPlatform === false && (!externalCref || externalCref.length < 5)) {
+      return Errors.validation(reply, [{
+        message: "Informe o CREF do profissional que você vai utilizar (external_cref).",
+      }]);
+    }
+  }
+
+  const memberCount = memberEmails.length;
+
+  // ---- 3. Verifica capacidade para toda equipe ----
+  if (event.capacity !== null && event.enrolled + memberCount > event.capacity) {
+    return Errors.conflict(reply, `Vagas insuficientes. Disponíveis: ${event.capacity - event.enrolled}, solicitadas: ${memberCount}.`);
+  }
+
+  // ---- 4. Valida que todos os e-mails são de usuários cadastrados ----
+  const foundUsers = await prisma.user.findMany({
+    where: { email: { in: memberEmails }, deleted_at: null },
+    select: { id: true, email: true },
+  });
+
+  const foundEmails = new Set(foundUsers.map((u) => u.email.toLowerCase()));
+  const notFound = memberEmails.filter((e) => !foundEmails.has(e));
+  if (notFound.length > 0) {
+    return reply.status(422).send({
+      success: false,
+      error: {
+        code: "MEMBERS_NOT_REGISTERED",
+        message: `Os seguintes e-mails não estão cadastrados na plataforma: ${notFound.join(", ")}. Todos os membros precisam ter uma conta antes da compra.`,
+        not_registered: notFound,
+      },
+    });
+  }
+
+  // ---- 5. Verifica se algum membro já tem ingresso ativo ----
+  const existingTickets = await prisma.ticket.findMany({
+    where: {
+      event_id: eventId,
+      user_id: { in: foundUsers.map((u) => u.id) },
+      status: "ativo",
+    },
+    select: { user_id: true },
+    take: memberCount,
+  });
+
+  if (existingTickets.length > 0) {
+    const enrolledUserIds = new Set(existingTickets.map((t) => t.user_id));
+    const enrolledEmails = foundUsers
+      .filter((u) => enrolledUserIds.has(u.id))
+      .map((u) => u.email);
+    return Errors.conflict(reply, `Os seguintes membros já possuem ingresso para este evento: ${enrolledEmails.join(", ")}.`);
+  }
+
+  const totalAmountCents = event.price_cents * memberCount;
+
+  // ---- 6. Reutiliza compra pendente válida — apenas PIX ----
+  if (method === "pix") {
+    const existingTeam = await prisma.teamPurchase.findFirst({
+      where: {
+        event_id: eventId,
+        buyer_user_id: userId,
+        status: "pending",
+        member_emails: { equals: memberEmails },
+      },
+      include: { payment: true },
+    });
+
+    if (
+      existingTeam?.payment &&
+      existingTeam.payment.status === "pending" &&
+      existingTeam.payment.expires_at > new Date() &&
+      existingTeam.payment.pix_code
+    ) {
+      const p = existingTeam.payment;
+      return sendSuccess(reply, {
+        payment_id: p.id,
+        billing_id: p.billing_id,
+        method: p.method,
+        pix_code: p.pix_code,
+        pix_qr_code: null,
+        checkout_url: null,
+        amount_cents: p.amount,
+        expires_at: p.expires_at,
+        team_purchase_id: existingTeam.id,
+        member_count: memberCount,
+      }, 201);
+    }
+  }
+
+  // ---- 7. Cria TeamPurchase + Payment ----
+  const expiresAt = new Date(Date.now() + PAYMENT_TTL_SECONDS * 1000);
+
+  const teamPurchase = await prisma.teamPurchase.create({
+    data: {
+      event_id: eventId,
+      buyer_user_id: userId,
+      member_emails: memberEmails,
+      member_count: memberCount,
+      status: "pending",
+      // Armazena escolha de profissional para ser propagada a cada Ticket na confirmação
+      ...(event.requires_professional_choice && usesPlatform !== undefined
+        ? {
+            uses_platform_professional: usesPlatform,
+            external_cref: usesPlatform ? null : externalCref,
+          }
+        : {}),
+    },
+  });
+
+  const payment = await prisma.payment.create({
+    data: {
+      event_id: eventId,
+      user_id: userId,
+      billing_id: "pending",
+      checkout_url: "",
+      amount: totalAmountCents,
+      method,
+      status: "pending",
+      expires_at: expiresAt,
+    },
+  });
+
+  // Vincula TeamPurchase ao Payment
+  await prisma.teamPurchase.update({
+    where: { id: teamPurchase.id },
+    data: { payment_id: payment.id },
+  });
+
+  // ---- 8a. PIX ----
+  if (method === "pix") {
+    let charge: abacatepay.AbacatePixCharge;
+    try {
+      charge = await abacatepay.createPixCharge(env.ABACATEPAY_API_KEY, env.ABACATEPAY_BASE_URL, {
+        amount: totalAmountCents,
+        description: `Inscrição equipe (${memberCount}x): ${event.title}`,
+        internalId: payment.id,
+        expiresIn: PAYMENT_TTL_SECONDS,
+      });
+    } catch (err) {
+      await prisma.payment.delete({ where: { id: payment.id } }).catch(() => {});
+      await prisma.teamPurchase.delete({ where: { id: teamPurchase.id } }).catch(() => {});
+      request.log.error(err, "AbacatePay PIX charge creation failed (team)");
+      return Errors.internal(reply);
+    }
+
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        billing_id: charge.id,
+        pix_code: charge.pixCode ?? null,
+        expires_at: charge.expiresAt ? new Date(charge.expiresAt) : expiresAt,
+      },
+    });
+
+    return sendSuccess(reply, {
+      payment_id: payment.id,
+      billing_id: charge.id,
+      method: "pix",
+      pix_code: charge.pixCode ?? null,
+      pix_qr_code: charge.pixQrCode ?? null,
+      checkout_url: null,
+      amount_cents: totalAmountCents,
+      expires_at: charge.expiresAt ?? expiresAt.toISOString(),
+      team_purchase_id: teamPurchase.id,
+      member_count: memberCount,
+    }, 201);
+  }
+
+  // ---- 8b. Cartão de crédito ----
+  if (method === "credit_card") {
+    let productId: string;
+    try {
+      productId = await abacatepay.findOrCreateProduct(
+        env.ABACATEPAY_API_KEY,
+        env.ABACATEPAY_BASE_URL,
+        `${event.id}-team-${memberCount}`,
+        `${event.title} (equipe ${memberCount} membros)`,
+        totalAmountCents,
+      );
+    } catch (err) {
+      await prisma.payment.delete({ where: { id: payment.id } }).catch(() => {});
+      await prisma.teamPurchase.delete({ where: { id: teamPurchase.id } }).catch(() => {});
+      request.log.error(err, "AbacatePay product find/create failed (team)");
+      return Errors.internal(reply);
+    }
+
+    let checkout: abacatepay.AbacateCardCheckout;
+    try {
+      checkout = await abacatepay.createCardCheckout(
+        env.ABACATEPAY_API_KEY,
+        env.ABACATEPAY_BASE_URL,
+        {
+          productId,
+          externalId: payment.id,
+          completionUrl: `${env.FRONTEND_URL}?payment_success=${payment.id}`,
+          returnUrl: env.FRONTEND_URL,
+          maxInstallments: Math.min(12, Math.floor(totalAmountCents / 1000)) || 1,
+        },
+      );
+    } catch (err) {
+      await prisma.payment.delete({ where: { id: payment.id } }).catch(() => {});
+      await prisma.teamPurchase.delete({ where: { id: teamPurchase.id } }).catch(() => {});
+      request.log.error(err, "AbacatePay card checkout creation failed (team)");
+      return Errors.internal(reply);
+    }
+
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        billing_id: checkout.id,
+        checkout_url: checkout.url,
+        expires_at: expiresAt,
+      },
+    });
+
+    return sendSuccess(reply, {
+      payment_id: payment.id,
+      billing_id: checkout.id,
+      method: "credit_card",
+      pix_code: null,
+      pix_qr_code: null,
+      checkout_url: checkout.url,
+      amount_cents: totalAmountCents,
+      expires_at: expiresAt.toISOString(),
+      team_purchase_id: teamPurchase.id,
+      member_count: memberCount,
     }, 201);
   }
 

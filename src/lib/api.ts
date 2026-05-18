@@ -313,10 +313,32 @@ export async function enrollFreeEvent(eventId: string): Promise<{ enrolled: bool
 
 export type PaymentMethod = 'pix' | 'credit_card';
 
-export async function initiateCheckout(eventId: string, method: PaymentMethod): Promise<PaymentSession> {
+export interface ProfessionalChoice {
+  uses_platform_professional: boolean;
+  external_cref?: string;
+}
+
+export async function initiateCheckout(
+  eventId: string,
+  method: PaymentMethod,
+  professionalChoice?: ProfessionalChoice,
+): Promise<PaymentSession> {
   const res = await request<ApiResponse<PaymentSession>>(
     `/api/v1/checkout/events/${encodeURIComponent(eventId)}`,
-    { method: 'POST', body: JSON.stringify({ method }) },
+    { method: 'POST', body: JSON.stringify({ method, ...professionalChoice }) },
+  );
+  return res.data;
+}
+
+export async function initiateTeamCheckout(
+  eventId: string,
+  method: PaymentMethod,
+  memberEmails: string[],
+  professionalChoice?: ProfessionalChoice,
+): Promise<PaymentSession> {
+  const res = await request<ApiResponse<PaymentSession>>(
+    `/api/v1/checkout/events/${encodeURIComponent(eventId)}/team`,
+    { method: 'POST', body: JSON.stringify({ method, member_emails: memberEmails, ...professionalChoice }) },
   );
   return res.data;
 }

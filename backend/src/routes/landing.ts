@@ -380,6 +380,8 @@ export async function landingRoutes(app: FastifyInstance) {
                 ranking_points: { type: "integer", nullable: true },
                 reward: { type: "string" },
                 note: { type: "string", nullable: true },
+                allow_team_purchase: { type: "boolean" },
+                requires_professional_choice: { type: "boolean" },
                 created_at: { type: "string", format: "date-time" },
                 organizer: {
                   type: "object",
@@ -421,6 +423,8 @@ export async function landingRoutes(app: FastifyInstance) {
           ranking_points: true,
           reward: true,
           note: true,
+          allow_team_purchase: true,
+          requires_professional_choice: true,
           created_at: true,
           // Nunca expor dados privados do organizador além de id e full_name
           organizer: { select: { id: true, full_name: true } },

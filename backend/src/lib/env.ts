@@ -39,26 +39,47 @@ const envSchema = z.object({
   SWAGGER_PASS: z.string().optional(),
 
   // Object storage — Supabase Storage (S3-compatible)
-  STORAGE_ENDPOINT: z.string().url(),
+  // Opcional em dev — obrigatório em produção (validado via superRefine abaixo)
+  STORAGE_ENDPOINT: z.string().url().optional(),
   STORAGE_REGION: z.string().default("us-east-1"),
-  STORAGE_ACCESS_KEY_ID: z.string().min(1),
-  STORAGE_SECRET_ACCESS_KEY: z.string().min(1),
-  STORAGE_BUCKET: z.string().min(1),
-  STORAGE_PUBLIC_URL: z.string().url(),
+  STORAGE_ACCESS_KEY_ID: z.string().min(1).optional(),
+  STORAGE_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  STORAGE_BUCKET: z.string().min(1).optional(),
+  STORAGE_PUBLIC_URL: z.string().url().optional(),
 
   // E-mail (Resend)
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("noreply@extremesportscompetition.com"),
   EMAIL_FINANCIAL: z.string().default("financeiro@extremesportscompetition.com"),
 }).superRefine((data, ctx) => {
-  // ABACATEPAY_WEBHOOK_SECRET é obrigatório em produção —
-  // sem ele qualquer requisição passa pela validação de assinatura
-  if (data.NODE_ENV === "production" && !data.ABACATEPAY_WEBHOOK_SECRET) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["ABACATEPAY_WEBHOOK_SECRET"],
-      message: "ABACATEPAY_WEBHOOK_SECRET é obrigatório em produção",
-    });
+  if (data.NODE_ENV === "production") {
+    // ABACATEPAY_WEBHOOK_SECRET é obrigatório em produção
+    if (!data.ABACATEPAY_WEBHOOK_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ABACATEPAY_WEBHOOK_SECRET"],
+        message: "ABACATEPAY_WEBHOOK_SECRET é obrigatório em produção",
+      });
+    }
+
+    // Variáveis de storage são obrigatórias em produção
+    const storageFields = [
+      "STORAGE_ENDPOINT",
+      "STORAGE_ACCESS_KEY_ID",
+      "STORAGE_SECRET_ACCESS_KEY",
+      "STORAGE_BUCKET",
+      "STORAGE_PUBLIC_URL",
+    ] as const;
+
+    for (const field of storageFields) {
+      if (!data[field]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: `${field} é obrigatório em produção`,
+        });
+      }
+    }
   }
 });
 

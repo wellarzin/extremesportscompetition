@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, RefreshCw, Calendar, MapPin, Users, Gift,
   Copy, Check, ExternalLink, Clock, Lock, Ticket, AlertCircle,
-  Zap, CreditCard, FileDown,
+  Zap, CreditCard, FileDown, UserPlus, Trash2, ChevronRight,
 } from 'lucide-react';
-import { fetchLandingEventDetail, enrollFreeEvent, initiateCheckout, getPaymentStatus, devSimulateCardCheckout, ApiError } from '../lib/api';
-import type { PaymentMethod } from '../lib/api';
+import { fetchLandingEventDetail, enrollFreeEvent, initiateCheckout, initiateTeamCheckout, getPaymentStatus, devSimulateCardCheckout, ApiError } from '../lib/api';
+import type { PaymentMethod, ProfessionalChoice } from '../lib/api';
 import type { LandingEventDetail, PaymentSession } from '../types/api';
 import { mediaUrl } from '../lib/utils';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -73,11 +73,252 @@ function formatCountdown(expiresAt: string): string {
 
 type CheckoutState =
   | { phase: 'idle' }
+  // Escolha de profissional (precede o método de pagamento quando evento exige)
+  | { phase: 'professional_choice'; flow: 'individual' | 'team'; teamEmails?: string[] }
   | { phase: 'selecting_method' }
   | { phase: 'loading'; method: PaymentMethod }
   | { phase: 'awaiting_payment'; session: PaymentSession; method: PaymentMethod }
-  | { phase: 'success' }
-  | { phase: 'error'; message: string };
+  | { phase: 'success'; isTeam?: boolean; memberCount?: number }
+  | { phase: 'error'; message: string }
+  // Fluxo de equipe
+  | { phase: 'team_emails' }
+  | { phase: 'team_selecting_method'; emails: string[] }
+  | { phase: 'team_loading'; method: PaymentMethod; emails: string[] };
+
+// ---- professional choice form ----
+
+function ProfessionalChoiceForm({
+  onConfirm,
+  onBack,
+}: {
+  onConfirm: (choice: ProfessionalChoice) => void;
+  onBack: () => void;
+}) {
+  const [answer, setAnswer] = useState<'yes' | 'no' | null>(null);
+  const [cref, setCref] = useState('');
+  const [crefTouched, setCrefTouched] = useState(false);
+
+  const crefValid = cref.trim().length >= 5;
+  const canContinue = answer === 'yes' || (answer === 'no' && crefValid);
+
+  function handleConfirm() {
+    if (!canContinue) return;
+    if (answer === 'yes') {
+      onConfirm({ uses_platform_professional: true });
+    } else {
+      onConfirm({ uses_platform_professional: false, external_cref: cref.trim() });
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-white/90 leading-snug">
+          Você vai utilizar os serviços de profissionais cadastrados na plataforma?
+        </p>
+        <p className="text-xs text-white/40">
+          Educadores físicos e nutricionistas credenciados pela Extreme Competition.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => setAnswer('yes')}
+          className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${
+            answer === 'yes'
+              ? 'bg-[#00C45A]/15 border-[#00C45A]/50 text-[#00C45A]'
+              : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/8 hover:border-white/20'
+          }`}
+        >
+          {answer === 'yes' && <Check className="w-4 h-4 flex-shrink-0" />}
+          Sim
+        </button>
+        <button
+          onClick={() => setAnswer('no')}
+          className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${
+            answer === 'no'
+              ? 'bg-[#FF6B00]/15 border-[#FF6B00]/50 text-[#FF6B00]'
+              : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/8 hover:border-white/20'
+          }`}
+        >
+          Não
+        </button>
+      </div>
+
+      {answer === 'no' && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-white/60 uppercase tracking-wider">
+            CREF do profissional
+          </label>
+          <input
+            type="text"
+            placeholder="Ex: CREF 012345-G/SP"
+            value={cref}
+            onChange={(e) => setCref(e.target.value)}
+            onBlur={() => setCrefTouched(true)}
+            className={`w-full bg-white/5 border rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none focus:ring-1 transition-all ${
+              crefTouched && !crefValid
+                ? 'border-red-500/50 focus:ring-red-500/30'
+                : 'border-white/10 focus:border-white/25 focus:ring-white/10'
+            }`}
+          />
+          {crefTouched && !crefValid && (
+            <p className="text-[11px] text-red-400 pl-1">Informe o CREF completo.</p>
+          )}
+          <p className="text-[11px] text-white/30 pl-1">
+            O profissional não precisa estar cadastrado na plataforma.
+          </p>
+        </div>
+      )}
+
+      <button
+        onClick={handleConfirm}
+        disabled={!canContinue}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#FF6B00] hover:bg-[#FF8533] text-white font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+      >
+        <ChevronRight className="w-4 h-4" />
+        Continuar
+      </button>
+
+      <button
+        onClick={onBack}
+        className="w-full text-xs text-white/30 hover:text-white/60 py-1 transition-colors"
+      >
+        Cancelar
+      </button>
+    </div>
+  );
+}
+
+// ---- team emails form ----
+
+function TeamEmailsForm({
+  priceCents,
+  onConfirm,
+  onBack,
+}: {
+  priceCents: number;
+  onConfirm: (emails: string[]) => void;
+  onBack: () => void;
+}) {
+  const [emails, setEmails] = useState<string[]>(['', '']);
+  const [touched, setTouched] = useState<boolean[]>([false, false]);
+
+  const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+
+  const addEmail = () => {
+    setEmails((prev) => [...prev, '']);
+    setTouched((prev) => [...prev, false]);
+  };
+
+  const removeEmail = (i: number) => {
+    setEmails((prev) => prev.filter((_, idx) => idx !== i));
+    setTouched((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
+  const updateEmail = (i: number, value: string) => {
+    setEmails((prev) => prev.map((e, idx) => (idx === i ? value : e)));
+  };
+
+  const blurEmail = (i: number) => {
+    setTouched((prev) => prev.map((t, idx) => (idx === i ? true : t)));
+  };
+
+  const filledEmails = emails.map((e) => e.trim()).filter(Boolean);
+  const uniqueEmails = [...new Set(filledEmails)];
+  const hasDuplicates = filledEmails.length !== uniqueEmails.length;
+  const allValid = uniqueEmails.length >= 2 && uniqueEmails.every(isValidEmail) && !hasDuplicates;
+  const totalCents = priceCents * uniqueEmails.length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-sm font-semibold text-white/80">Membros da equipe</p>
+        {uniqueEmails.length >= 2 && (
+          <span className="text-base font-bold text-white">{formatPrice(totalCents)}</span>
+        )}
+      </div>
+
+      {/* Aviso obrigatório */}
+      <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-[#FF6B00]/10 border border-[#FF6B00]/20">
+        <AlertCircle className="w-4 h-4 text-[#FF6B00] flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-white/70 leading-relaxed">
+          <span className="font-semibold text-[#FF6B00]">Atenção:</span> todos os membros precisam ter uma conta cadastrada na plataforma. O ingresso será adicionado automaticamente ao perfil de cada um após o pagamento.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {emails.map((email, i) => {
+          const val = email.trim();
+          const showError = touched[i] && val.length > 0 && !isValidEmail(val);
+          const isDup = touched[i] && val.length > 0 && filledEmails.filter((e) => e === val).length > 1;
+          return (
+            <div key={i} className="flex gap-2 items-center">
+              <div className="flex-1 relative">
+                <input
+                  type="email"
+                  placeholder={`E-mail do membro ${i + 1}`}
+                  value={email}
+                  onChange={(e) => updateEmail(i, e.target.value)}
+                  onBlur={() => blurEmail(i)}
+                  className={`w-full bg-white/5 border rounded-xl px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:ring-1 transition-all ${
+                    showError || isDup
+                      ? 'border-red-500/50 focus:ring-red-500/30'
+                      : 'border-white/10 focus:border-white/25 focus:ring-white/10'
+                  }`}
+                />
+                {(showError || isDup) && (
+                  <p className="text-[11px] text-red-400 mt-1 pl-1">
+                    {isDup ? 'E-mail duplicado' : 'E-mail inválido'}
+                  </p>
+                )}
+              </div>
+              {emails.length > 2 && (
+                <button
+                  onClick={() => removeEmail(i)}
+                  aria-label="Remover membro"
+                  className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {emails.length < 50 && (
+        <button
+          onClick={addEmail}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-dashed border-white/15 text-white/40 hover:text-white/70 hover:border-white/25 text-sm transition-all"
+        >
+          <UserPlus className="w-4 h-4" />
+          Adicionar membro
+        </button>
+      )}
+
+      {hasDuplicates && (
+        <p className="text-xs text-red-400 text-center">Remova os e-mails duplicados antes de continuar.</p>
+      )}
+
+      <button
+        onClick={() => onConfirm(uniqueEmails)}
+        disabled={!allValid}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#FF6B00] hover:bg-[#FF8533] text-white font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+      >
+        <ChevronRight className="w-4 h-4" />
+        Continuar — {formatPrice(totalCents)}
+      </button>
+
+      <button
+        onClick={onBack}
+        className="w-full text-xs text-white/30 hover:text-white/60 py-1 transition-colors"
+      >
+        Cancelar
+      </button>
+    </div>
+  );
+}
 
 // ---- method selector ----
 
@@ -331,6 +572,7 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [checkout, setCheckout] = useState<CheckoutState>({ phase: 'idle' });
+  const [professionalChoice, setProfessionalChoice] = useState<ProfessionalChoice | null>(null);
 
   const { user } = useAuthContext();
   const { openAuthModal } = useAuthModal();
@@ -363,30 +605,73 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
         const message = err instanceof ApiError ? err.message : 'Ocorreu um erro. Tente novamente.';
         setCheckout({ phase: 'error', message });
       }
+    } else if (detail.requires_professional_choice) {
+      setProfessionalChoice(null);
+      setCheckout({ phase: 'professional_choice', flow: 'individual' });
     } else {
       setCheckout({ phase: 'selecting_method' });
     }
   }, [detail, user, eventId, openAuthModal]);
 
+  const handleTeamEnroll = useCallback(() => {
+    if (!user) { openAuthModal(); return; }
+    setCheckout({ phase: 'team_emails' });
+  }, [user, openAuthModal]);
+
+  const handleTeamEmailsConfirmed = useCallback((emails: string[]) => {
+    if (detail?.requires_professional_choice) {
+      setProfessionalChoice(null);
+      setCheckout({ phase: 'professional_choice', flow: 'team', teamEmails: emails });
+    } else {
+      setCheckout({ phase: 'team_selecting_method', emails });
+    }
+  }, [detail]);
+
+  const handleProfessionalChoiceConfirmed = useCallback((choice: ProfessionalChoice) => {
+    setProfessionalChoice(choice);
+    const co = checkout;
+    if (co.phase === 'professional_choice') {
+      if (co.flow === 'team' && co.teamEmails) {
+        setCheckout({ phase: 'team_selecting_method', emails: co.teamEmails });
+      } else {
+        setCheckout({ phase: 'selecting_method' });
+      }
+    }
+  }, [checkout]);
+
   const handleMethodSelected = useCallback(async (method: PaymentMethod) => {
     if (!detail) return;
     setCheckout({ phase: 'loading', method });
     try {
-      const session = await initiateCheckout(eventId, method);
+      const session = await initiateCheckout(eventId, method, professionalChoice ?? undefined);
       setCheckout({ phase: 'awaiting_payment', session, method });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Ocorreu um erro. Tente novamente.';
       setCheckout({ phase: 'error', message });
     }
-  }, [detail, eventId]);
+  }, [detail, eventId, professionalChoice]);
+
+  const handleTeamMethodSelected = useCallback(async (method: PaymentMethod, emails: string[]) => {
+    setCheckout({ phase: 'team_loading', method, emails });
+    try {
+      const session = await initiateTeamCheckout(eventId, method, emails, professionalChoice ?? undefined);
+      setCheckout({ phase: 'awaiting_payment', session, method });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Ocorreu um erro. Tente novamente.';
+      setCheckout({ phase: 'error', message });
+    }
+  }, [eventId, professionalChoice]);
 
   const handleExpired = useCallback(() => {
     setCheckout({ phase: 'error', message: 'O tempo para pagamento expirou. Tente novamente.' });
   }, []);
 
   const handlePaid = useCallback(() => {
-    setCheckout({ phase: 'success' });
-  }, []);
+    const co = checkout;
+    const isTeam = co.phase === 'awaiting_payment' && co.session.team_purchase_id !== undefined;
+    const memberCount = co.phase === 'awaiting_payment' ? co.session.member_count : undefined;
+    setCheckout({ phase: 'success', isTeam, memberCount });
+  }, [checkout]);
 
   const resetCheckout = useCallback(() => {
     setCheckout({ phase: 'idle' });
@@ -394,7 +679,11 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
 
   // ---- button label / disabled ----
   const isEventOpen = detail?.status === 'aberto';
-  const actionDisabled = !isEventOpen || checkout.phase === 'loading';
+  const actionDisabled =
+    !isEventOpen ||
+    checkout.phase === 'loading' ||
+    checkout.phase === 'team_loading' ||
+    checkout.phase === 'professional_choice';
 
   function renderActionButton() {
     if (!isEventOpen) {
@@ -409,7 +698,9 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
       );
     }
 
-    if (checkout.phase === 'loading') {
+    const isLoading = checkout.phase === 'loading' || checkout.phase === 'team_loading';
+
+    if (isLoading) {
       return (
         <button
           disabled
@@ -434,33 +725,52 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
     }
 
     return (
-      <button
-        onClick={handleEnroll}
-        disabled={actionDisabled}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#FF6B00] hover:bg-[#FF8533] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {detail?.price_cents === 0 ? (
-          <><Ticket className="w-5 h-5" /> Inscrever-se Gratuitamente</>
-        ) : (
-          <><Ticket className="w-5 h-5" /> Comprar Ingresso</>
+      <div className="space-y-2">
+        <button
+          onClick={handleEnroll}
+          disabled={actionDisabled}
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#FF6B00] hover:bg-[#FF8533] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {detail?.price_cents === 0 ? (
+            <><Ticket className="w-5 h-5" /> Inscrever-se Gratuitamente</>
+          ) : (
+            <><Ticket className="w-5 h-5" /> Comprar Ingresso Individual</>
+          )}
+        </button>
+
+        {detail?.allow_team_purchase && detail.price_cents > 0 && (
+          <button
+            onClick={handleTeamEnroll}
+            disabled={actionDisabled}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 border border-[#00FF87]/20 hover:border-[#00FF87]/40 text-[#00FF87] font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            <Users className="w-4 h-4" />
+            Comprar para a equipe inteira
+          </button>
         )}
-      </button>
+      </div>
     );
   }
 
   function renderSidebarCheckout() {
     if (checkout.phase === 'success') {
+      const isTeam = checkout.isTeam;
+      const memberCount = checkout.memberCount;
       return (
         <div className="space-y-4">
           <div className="p-5 bg-[#00C45A]/10 border border-[#00C45A]/25 rounded-xl text-center space-y-3">
             <div className="w-12 h-12 rounded-full bg-[#00C45A]/20 flex items-center justify-center mx-auto">
               <Check className="w-6 h-6 text-[#00C45A]" />
             </div>
-            <p className="text-[#00C45A] font-bold text-lg">Inscrição confirmada!</p>
+            <p className="text-[#00C45A] font-bold text-lg">
+              {isTeam ? 'Equipe inscrita!' : 'Inscrição confirmada!'}
+            </p>
             <p className="text-white/50 text-sm">
-              {detail?.price_cents === 0
-                ? 'Você está inscrito neste evento.'
-                : 'Pagamento recebido. Seu ingresso está garantido.'}
+              {isTeam
+                ? `Pagamento recebido. ${memberCount ? `${memberCount} ingressos foram` : 'Os ingressos foram'} adicionados automaticamente ao perfil de cada membro.`
+                : detail?.price_cents === 0
+                  ? 'Você está inscrito neste evento.'
+                  : 'Pagamento recebido. Seu ingresso está garantido.'}
             </p>
           </div>
         </div>
@@ -486,6 +796,44 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
       );
     }
 
+    // Escolha de profissional
+    if (checkout.phase === 'professional_choice') {
+      const isTeamFlow = checkout.flow === 'team';
+      return (
+        <ProfessionalChoiceForm
+          onConfirm={handleProfessionalChoiceConfirmed}
+          onBack={() =>
+            isTeamFlow
+              ? setCheckout({ phase: 'team_emails' })
+              : resetCheckout()
+          }
+        />
+      );
+    }
+
+    // Fluxo de equipe — inserir e-mails
+    if (checkout.phase === 'team_emails') {
+      return (
+        <TeamEmailsForm
+          priceCents={detail?.price_cents ?? 0}
+          onConfirm={handleTeamEmailsConfirmed}
+          onBack={resetCheckout}
+        />
+      );
+    }
+
+    // Fluxo de equipe — escolher método de pagamento
+    if (checkout.phase === 'team_selecting_method') {
+      const totalCents = (detail?.price_cents ?? 0) * checkout.emails.length;
+      return (
+        <MethodSelector
+          amountCents={totalCents}
+          onSelect={(method) => handleTeamMethodSelected(method, checkout.emails)}
+          onBack={() => setCheckout({ phase: 'team_emails' })}
+        />
+      );
+    }
+
     if (checkout.phase === 'selecting_method') {
       return (
         <MethodSelector
@@ -507,7 +855,7 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
       );
     }
 
-    // idle / loading — show price block + button
+    // idle / loading / team_loading — show price block + button
     return (
       <div className="space-y-4">
         <div className="p-4 bg-gradient-to-r from-[#4169E1]/20 to-[#FF6B00]/20 rounded-xl border border-[#4169E1]/20">
@@ -515,6 +863,12 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
           <p className={`text-3xl font-bold ${detail?.price_cents === 0 ? 'text-[#00C45A]' : 'text-white'}`}>
             {detail ? formatPrice(detail.price_cents) : '—'}
           </p>
+          {detail?.allow_team_purchase && detail.price_cents > 0 && (
+            <p className="text-[#00FF87]/60 text-xs mt-1 flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              Disponível para compra em equipe
+            </p>
+          )}
           {detail?.capacity !== null && detail?.capacity !== undefined && (
             <p className="text-white/40 text-xs mt-2">
               {detail.capacity === 999

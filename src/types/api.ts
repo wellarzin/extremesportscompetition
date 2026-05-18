@@ -56,6 +56,8 @@ export interface LandingEventDetail extends LandingEvent {
   rules: string | null;
   rules_file_url: string | null;
   note: string | null;
+  allow_team_purchase: boolean;
+  requires_professional_choice: boolean;
   created_at: string;
 }
 
@@ -157,6 +159,9 @@ export interface PaymentSession {
   checkout_url: string | null;
   amount_cents: number;
   expires_at: string;
+  // Presentes apenas em compras de equipe
+  team_purchase_id?: string;
+  member_count?: number;
 }
 
 export interface PaymentStatusResponse {

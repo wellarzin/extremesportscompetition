@@ -235,6 +235,13 @@ enum StoreOrderStatus {
   refunded
 }
 
+enum TeamPurchaseStatus {
+  pending
+  paid
+  failed
+  expired
+}
+
 enum ProfessionalSpecialty {
   hipertrofia
   emagrecimento
@@ -324,6 +331,7 @@ model User {
   email_change_tokens         EmailChangeToken[]
   payments                    Payment[]
   store_orders                StoreOrder[]
+  team_purchases_bought       TeamPurchase[]             @relation("TeamPurchaseBuyer")
 
   @@index([email])
   @@index([document_number_hash])
@@ -460,15 +468,20 @@ model Event {
   ranking_points  Int?
   reward          String        @default("A definir")
   rules_file_url  String?
-  note            String?       @db.Text
-  created_at      DateTime      @default(now())
-  updated_at      DateTime      @updatedAt
-  deleted_at      DateTime?
+  note                        String?       @db.Text
+  allow_team_purchase         Boolean       @default(false)
+  // Quando true, o comprador deve declarar se usará profissional da plataforma
+  // ou informar o CREF de um profissional externo antes de pagar.
+  requires_professional_choice Boolean      @default(false)
+  created_at                  DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
+  deleted_at          DateTime?
 
-  organizer User       @relation("EventOrganizer", fields: [organizer_id], references: [id], onDelete: Restrict)
-  tickets   Ticket[]
-  waitlist  Waitlist[]
-  payments  Payment[]
+  organizer      User           @relation("EventOrganizer", fields: [organizer_id], references: [id], onDelete: Restrict)
+  tickets        Ticket[]
+  waitlist       Waitlist[]
+  payments       Payment[]
+  team_purchases TeamPurchase[]
 
   @@index([organizer_id])
   @@index([status])
@@ -488,13 +501,20 @@ model Ticket {
   purchased_at     DateTime     @default(now())
   used_at          DateTime?
 
-  event   Event    @relation(fields: [event_id], references: [id], onDelete: Restrict)
-  user    User     @relation(fields: [user_id], references: [id], onDelete: Restrict)
-  payment Payment?
+  team_purchase_id             String?       @db.Uuid
+  // Escolha de profissional — preenchida quando o evento exige (requires_professional_choice)
+  uses_platform_professional   Boolean?
+  external_cref                String?       @db.VarChar(60)
+
+  event         Event         @relation(fields: [event_id], references: [id], onDelete: Restrict)
+  user          User          @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  payment       Payment?
+  team_purchase TeamPurchase? @relation(fields: [team_purchase_id], references: [id])
 
   @@index([event_id])
   @@index([user_id])
   @@index([status])
+  @@index([team_purchase_id])
   @@map("tickets")
 }
 
@@ -527,12 +547,16 @@ model Payment {
   status       PaymentStatus @default(pending)
   ticket_id    String?       @unique @db.Uuid
   expires_at   DateTime
+  // Transporta a escolha de profissional até a criação do Ticket (webhook/polling)
+  prof_uses_platform  Boolean?
+  prof_external_cref  String?  @db.VarChar(60)
   created_at   DateTime      @default(now())
   updated_at   DateTime      @updatedAt
 
-  event  Event   @relation(fields: [event_id], references: [id], onDelete: Restrict)
-  user   User    @relation(fields: [user_id], references: [id], onDelete: Restrict)
-  ticket Ticket? @relation(fields: [ticket_id], references: [id])
+  event         Event         @relation(fields: [event_id], references: [id], onDelete: Restrict)
+  user          User          @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  ticket        Ticket?       @relation(fields: [ticket_id], references: [id])
+  team_purchase TeamPurchase?
 
   @@index([user_id])
   @@index([event_id])
@@ -705,6 +729,42 @@ model RankingHistory {
   @@index([ranking_id])
   @@index([changed_at])
   @@map("ranking_history")
+}
+
+// ============================================================
+// COMPRA POR EQUIPE
+// ============================================================
+
+// Agrupa a compra de ingressos para múltiplos membros de uma equipe.
+// O pagador (buyer) realiza um único pagamento cujo valor é
+// price_cents_por_membro × member_count. Após confirmação,
+// um Ticket é criado para cada e-mail listado em member_emails.
+// REGRA: todos os e-mails devem pertencer a usuários cadastrados.
+model TeamPurchase {
+  id            String             @id @default(uuid()) @db.Uuid
+  event_id      String             @db.Uuid
+  buyer_user_id String             @db.Uuid
+  // Referência ao Payment criado para este grupo; null até o Payment ser gerado
+  payment_id    String?            @unique @db.Uuid
+  // E-mails de todos os membros da equipe (já validados no backend)
+  member_emails              String[]
+  member_count               Int
+  // Escolha de profissional (quando evento exige requires_professional_choice)
+  uses_platform_professional Boolean?
+  external_cref              String?  @db.VarChar(60)
+  status                     TeamPurchaseStatus @default(pending)
+  created_at    DateTime           @default(now())
+  updated_at    DateTime           @updatedAt
+
+  event   Event    @relation(fields: [event_id], references: [id], onDelete: Restrict)
+  buyer   User     @relation("TeamPurchaseBuyer", fields: [buyer_user_id], references: [id], onDelete: Restrict)
+  payment Payment? @relation(fields: [payment_id], references: [id])
+  tickets Ticket[]
+
+  @@index([event_id])
+  @@index([buyer_user_id])
+  @@index([status])
+  @@map("team_purchases")
 }
 
 // ============================================================
