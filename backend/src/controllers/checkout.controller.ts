@@ -168,7 +168,7 @@ async function processTeamPaymentConfirmation(
     event: { id: string; capacity: number | null; enrolled: number };
     team_purchase: {
       id: string;
-      member_emails: string[];
+      member_emails: any;
       member_count: number;
       uses_platform_professional: boolean | null;
       external_cref: string | null;
@@ -188,7 +188,7 @@ async function processTeamPaymentConfirmation(
 
     // Busca usuários pelos e-mails dos membros
     const members = await tx.user.findMany({
-      where: { email: { in: team_purchase.member_emails }, deleted_at: null },
+      where: { email: { in: team_purchase.member_emails as string[] }, deleted_at: null },
       select: { id: true, email: true },
     });
 

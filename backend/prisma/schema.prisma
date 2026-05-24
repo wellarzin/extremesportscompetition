@@ -1,6 +1,6 @@
 // ============================================================
 // Extreme Competition — Prisma Schema
-// Banco: PostgreSQL (NeonDB)
+// Banco: mysql (NeonDB)
 // ============================================================
 
 generator client {
@@ -8,9 +8,9 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider  = "mysql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+
 }
 
 // ============================================================
@@ -268,7 +268,7 @@ enum ProfessionalSpecialty {
 // ============================================================
 
 model User {
-  id                   String         @id @default(uuid()) @db.Uuid
+  id                   String         @id @default(uuid())
   full_name            String         @db.VarChar(255)
   photo_url            String?
   birth_date           DateTime       @db.Date
@@ -342,12 +342,12 @@ model User {
 
 // Refresh tokens com rotação e detecção de reutilização por família
 model RefreshToken {
-  id         String    @id @default(uuid()) @db.Uuid
-  user_id    String    @db.Uuid
+  id         String    @id @default(uuid())
+  user_id    String   
   // SHA-256 do token bruto — nunca armazenar o valor raw
   token_hash String    @unique
   // UUID compartilhado por toda a cadeia de rotação; reuso de token revogado revoga a família inteira
-  family     String    @db.Uuid
+  family     String   
   revoked    Boolean   @default(false)
   revoked_at DateTime?
   expires_at DateTime
@@ -362,8 +362,8 @@ model RefreshToken {
 }
 
 model EmailVerificationToken {
-  id         String    @id @default(uuid()) @db.Uuid
-  user_id    String    @db.Uuid
+  id         String    @id @default(uuid())
+  user_id    String   
   token_hash String    @unique
   expires_at DateTime
   used_at    DateTime?
@@ -376,8 +376,8 @@ model EmailVerificationToken {
 }
 
 model PasswordResetToken {
-  id         String    @id @default(uuid()) @db.Uuid
-  user_id    String    @db.Uuid
+  id         String    @id @default(uuid())
+  user_id    String   
   token_hash String    @unique
   expires_at DateTime
   used_at    DateTime?
@@ -391,8 +391,8 @@ model PasswordResetToken {
 
 // Tokens para troca de e-mail (novo e-mail precisa ser verificado antes de ser aplicado)
 model EmailChangeToken {
-  id         String    @id @default(uuid()) @db.Uuid
-  user_id    String    @db.Uuid
+  id         String    @id @default(uuid())
+  user_id    String   
   new_email  String    @db.VarChar(255)
   token_hash String    @unique
   expires_at DateTime
@@ -408,8 +408,8 @@ model EmailChangeToken {
 // ============================================================
 
 model UserSportPreference {
-  id            String       @id @default(uuid()) @db.Uuid
-  user_id       String       @db.Uuid
+  id            String       @id @default(uuid())
+  user_id       String      
   sport         Sport
   level         SportLevel
   practice_time PracticeTime
@@ -422,8 +422,8 @@ model UserSportPreference {
 }
 
 model UserEducationPreference {
-  id             String           @id @default(uuid()) @db.Uuid
-  user_id        String           @db.Uuid
+  id             String           @id @default(uuid())
+  user_id        String          
   subject        EducationSubject
   education_role EducationRole
   created_at     DateTime         @default(now())
@@ -435,8 +435,8 @@ model UserEducationPreference {
 }
 
 model UserCulturePreference {
-  id           String      @id @default(uuid()) @db.Uuid
-  user_id      String      @db.Uuid
+  id           String      @id @default(uuid())
+  user_id      String     
   culture_area CultureArea
   created_at   DateTime    @default(now())
 
@@ -447,8 +447,8 @@ model UserCulturePreference {
 }
 
 model Event {
-  id              String        @id @default(uuid()) @db.Uuid
-  organizer_id    String        @db.Uuid
+  id              String        @id @default(uuid())
+  organizer_id    String       
   title           String        @db.VarChar(255)
   cover_image_url String?
   category        EventCategory
@@ -493,15 +493,15 @@ model Event {
 }
 
 model Ticket {
-  id               String       @id @default(uuid()) @db.Uuid
-  event_id         String       @db.Uuid
-  user_id          String       @db.Uuid
+  id               String       @id @default(uuid())
+  event_id         String      
+  user_id          String      
   status           TicketStatus @default(ativo)
   price_paid_cents Int
   purchased_at     DateTime     @default(now())
   used_at          DateTime?
 
-  team_purchase_id             String?       @db.Uuid
+  team_purchase_id             String?      
   // Escolha de profissional — preenchida quando o evento exige (requires_professional_choice)
   uses_platform_professional   Boolean?
   external_cref                String?       @db.VarChar(60)
@@ -519,9 +519,9 @@ model Ticket {
 }
 
 model Waitlist {
-  id            String   @id @default(uuid()) @db.Uuid
-  event_id      String   @db.Uuid
-  user_id       String   @db.Uuid
+  id            String   @id @default(uuid())
+  event_id      String  
+  user_id       String  
   position      Int
   registered_at DateTime @default(now())
 
@@ -536,16 +536,16 @@ model Waitlist {
 }
 
 model Payment {
-  id           String        @id @default(uuid()) @db.Uuid
-  event_id     String        @db.Uuid
-  user_id      String        @db.Uuid
+  id           String        @id @default(uuid())
+  event_id     String       
+  user_id      String       
   billing_id   String        @unique
   checkout_url String
   pix_code     String?
   method       String        @default("pix") @db.VarChar(20)
   amount       Int
   status       PaymentStatus @default(pending)
-  ticket_id    String?       @unique @db.Uuid
+  ticket_id    String?       @unique
   expires_at   DateTime
   // Transporta a escolha de profissional até a criação do Ticket (webhook/polling)
   prof_uses_platform  Boolean?
@@ -565,8 +565,8 @@ model Payment {
 }
 
 model Professional {
-  id                  String    @id @default(uuid()) @db.Uuid
-  user_id             String?   @unique @db.Uuid
+  id                  String    @id @default(uuid())
+  user_id             String?   @unique
   photo_url           String?
   full_name           String    @db.VarChar(255)
   birth_date          DateTime  @db.Date
@@ -589,7 +589,7 @@ model Professional {
 }
 
 model News {
-  id              String       @id @default(uuid()) @db.Uuid
+  id              String       @id @default(uuid())
   slug            String       @unique @db.VarChar(255)
   title           String       @db.VarChar(255)
   excerpt         String       @db.VarChar(500)
@@ -610,8 +610,8 @@ model News {
 }
 
 model ProfessionalSpecialties {
-  id              String                @id @default(uuid()) @db.Uuid
-  professional_id String                @db.Uuid
+  id              String                @id @default(uuid())
+  professional_id String               
   specialty       ProfessionalSpecialty
   notes           String?               @db.VarChar(255)
 
@@ -622,8 +622,8 @@ model ProfessionalSpecialties {
 }
 
 model Ranking {
-  id                  String        @id @default(uuid()) @db.Uuid
-  user_id             String        @db.Uuid
+  id                  String        @id @default(uuid())
+  user_id             String       
   sport               Sport
   points              Int           @default(0)
   position            Int?
@@ -642,7 +642,7 @@ model Ranking {
 
 // Propostas recebidas via landing page (criação de eventos e patrocínio)
 model EventProposal {
-  id                  String         @id @default(uuid()) @db.Uuid
+  id                  String         @id @default(uuid())
   type                ProposalType   @default(event_creator)
   status              ProposalStatus @default(pending)
 
@@ -657,7 +657,7 @@ model EventProposal {
   event_date          String?        @db.VarChar(20)
   city                String?        @db.VarChar(100)
   budget              String?        @db.VarChar(100)
-  services            String[]
+  services            Json
 
   // Campos de patrocínio (type = sponsor)
   sponsorship_package String?        @db.VarChar(100)
@@ -676,8 +676,8 @@ model EventProposal {
 
 // Assinatura do profissional — controla o ciclo de vida do cadastro via pagamento recorrente
 model ProfessionalSubscription {
-  id                  String                         @id @default(uuid()) @db.Uuid
-  user_id             String                         @unique @db.Uuid
+  id                  String                         @id @default(uuid())
+  user_id             String                         @unique
   full_name           String                         @db.VarChar(255)
   birth_date          DateTime                       @db.Date
   education           String                         @db.VarChar(255)
@@ -692,7 +692,7 @@ model ProfessionalSubscription {
   amount_cents        Int
   status              ProfessionalSubscriptionStatus @default(pending_payment)
   // Vinculado após ativação via webhook
-  professional_id     String?                        @unique @db.Uuid
+  professional_id     String?                        @unique
   created_at          DateTime                       @default(now())
   updated_at          DateTime                       @updatedAt
 
@@ -706,8 +706,8 @@ model ProfessionalSubscription {
 }
 
 model ProfessionalSubscriptionSpecialty {
-  id              String                @id @default(uuid()) @db.Uuid
-  subscription_id String                @db.Uuid
+  id              String                @id @default(uuid())
+  subscription_id String               
   specialty       ProfessionalSpecialty
   notes           String?               @db.VarChar(255)
 
@@ -718,8 +718,8 @@ model ProfessionalSubscriptionSpecialty {
 }
 
 model RankingHistory {
-  id                String   @id @default(uuid()) @db.Uuid
-  ranking_id        String   @db.Uuid
+  id                String   @id @default(uuid())
+  ranking_id        String  
   previous_position Int
   new_position      Int
   changed_at        DateTime @default(now())
@@ -741,13 +741,13 @@ model RankingHistory {
 // um Ticket é criado para cada e-mail listado em member_emails.
 // REGRA: todos os e-mails devem pertencer a usuários cadastrados.
 model TeamPurchase {
-  id            String             @id @default(uuid()) @db.Uuid
-  event_id      String             @db.Uuid
-  buyer_user_id String             @db.Uuid
+  id            String             @id @default(uuid())
+  event_id      String            
+  buyer_user_id String            
   // Referência ao Payment criado para este grupo; null até o Payment ser gerado
-  payment_id    String?            @unique @db.Uuid
+  payment_id    String?            @unique
   // E-mails de todos os membros da equipe (já validados no backend)
-  member_emails              String[]
+  member_emails              Json
   member_count               Int
   // Escolha de profissional (quando evento exige requires_professional_choice)
   uses_platform_professional Boolean?
@@ -772,7 +772,7 @@ model TeamPurchase {
 // ============================================================
 
 model Product {
-  id          String          @id @default(uuid()) @db.Uuid
+  id          String          @id @default(uuid())
   name        String          @db.VarChar(255)
   description String?         @db.Text
   price_cents Int
@@ -793,8 +793,8 @@ model Product {
 }
 
 model StoreOrder {
-  id           String           @id @default(uuid()) @db.Uuid
-  user_id      String           @db.Uuid
+  id           String           @id @default(uuid())
+  user_id      String          
   status       StoreOrderStatus @default(pending_payment)
   total_cents  Int
   // AbacatePay reference
@@ -816,9 +816,9 @@ model StoreOrder {
 }
 
 model StoreOrderItem {
-  id               String @id @default(uuid()) @db.Uuid
-  order_id         String @db.Uuid
-  product_id       String @db.Uuid
+  id               String @id @default(uuid())
+  order_id         String
+  product_id       String
   quantity         Int
   unit_price_cents Int
 
