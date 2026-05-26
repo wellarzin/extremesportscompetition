@@ -16,7 +16,8 @@
       "Bash(npx tsc:*)",
       "Bash(npm run:*)",
       "Bash(xargs cat:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(xargs ls:*)"
     ]
   }
 }
