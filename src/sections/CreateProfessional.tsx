@@ -304,7 +304,7 @@ export function CreateProfessionalModal({ onClose }: Props) {
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
       {/* Modal */}
-      <div className="relative w-full max-w-xl bg-[#0f0f0f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-xl max-h-[90vh] flex flex-col bg-[#0f0f0f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
         {/* Top accent */}
         <div className="h-[2px] w-full bg-gradient-to-r from-[#4169E1] via-[#00FF87] to-[#FF6B00]" />
 
@@ -367,7 +367,7 @@ export function CreateProfessionalModal({ onClose }: Props) {
         )}
 
         {/* Body */}
-        <div className="px-6 pb-6">
+        <div className="px-6 pb-6 overflow-y-auto flex-1 min-h-0">
           {/* Checking status skeleton */}
           {isCheckingStatus && (
             <div className="flex items-center justify-center py-12">

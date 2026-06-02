@@ -288,6 +288,7 @@ export async function updateEvent(
   if (body.featured !== undefined && role === "admin") data.featured = body.featured;
   if (body.ranking_points !== undefined) data.ranking_points = body.ranking_points;
   if (body.reward !== undefined) data.reward = body.reward;
+  if (body.note !== undefined) data.note = body.note;
 
   const updated = await prisma.event.update({
     where: { id },
@@ -308,6 +309,7 @@ export async function updateEvent(
       status: true,
       ranking_points: true,
       reward: true,
+      note: true,
       updated_at: true,
     },
   });

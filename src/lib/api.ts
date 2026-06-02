@@ -333,12 +333,13 @@ export async function initiateCheckout(
 export async function initiateTeamCheckout(
   eventId: string,
   method: PaymentMethod,
+  teamName: string,
   memberEmails: string[],
   professionalChoice?: ProfessionalChoice,
 ): Promise<PaymentSession> {
   const res = await request<ApiResponse<PaymentSession>>(
     `/api/v1/checkout/events/${encodeURIComponent(eventId)}/team`,
-    { method: 'POST', body: JSON.stringify({ method, member_emails: memberEmails, ...professionalChoice }) },
+    { method: 'POST', body: JSON.stringify({ method, team_name: teamName, member_emails: memberEmails, ...professionalChoice }) },
   );
   return res.data;
 }

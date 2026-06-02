@@ -65,6 +65,7 @@ export const UpdateEventSchema = z
     featured: z.boolean().optional(),
     ranking_points: z.number().int().min(0).nullable().optional(),
     reward: z.string().min(3).max(500).trim().optional(),
+    note: z.string().max(10_000).trim().nullable().optional(),
   })
   .strict()
   .refine((d) => Object.keys(d).length > 0, { message: "Ao menos um campo deve ser fornecido." });

@@ -455,8 +455,8 @@ model Event {
   modality        EventModality
   start_datetime  DateTime
   end_datetime    DateTime?
-  description     String
-  rules           String?
+  description     String    @db.Text
+  rules           String?   @db.Text
   location        String?       @db.VarChar(255)
   city            String?       @db.VarChar(100)
   state           String?       @db.Char(2)
@@ -573,7 +573,7 @@ model Professional {
   education           String    @db.VarChar(255)
   registration_number String    @unique @db.VarChar(50)
   registration_type   String    @db.VarChar(20)
-  bio                 String?
+  bio                 String?   @db.Text
   active              Boolean   @default(true)
   created_at          DateTime  @default(now())
   updated_at          DateTime  @updatedAt
@@ -742,10 +742,12 @@ model RankingHistory {
 // REGRA: todos os e-mails devem pertencer a usuários cadastrados.
 model TeamPurchase {
   id            String             @id @default(uuid())
-  event_id      String            
-  buyer_user_id String            
+  event_id      String
+  buyer_user_id String
   // Referência ao Payment criado para este grupo; null até o Payment ser gerado
   payment_id    String?            @unique
+  // Nome da equipe
+  team_name                  String   @db.VarChar(100)
   // E-mails de todos os membros da equipe (já validados no backend)
   member_emails              Json
   member_count               Int

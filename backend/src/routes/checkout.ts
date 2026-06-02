@@ -75,11 +75,17 @@ export async function checkoutRoutes(app: FastifyInstance) {
       },
       body: {
         type: "object",
-        required: ["method", "member_emails"],
+        required: ["method", "member_emails", "team_name"],
         properties: {
           method: {
             type: "string",
             enum: ["pix", "credit_card"],
+          },
+          team_name: {
+            type: "string",
+            minLength: 2,
+            maxLength: 100,
+            description: "Nome da equipe para identificação da compra conjunta.",
           },
           member_emails: {
             type: "array",

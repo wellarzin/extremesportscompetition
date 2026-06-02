@@ -74,7 +74,7 @@ function formatCountdown(expiresAt: string): string {
 type CheckoutState =
   | { phase: 'idle' }
   // Escolha de profissional (precede o método de pagamento quando evento exige)
-  | { phase: 'professional_choice'; flow: 'individual' | 'team'; teamEmails?: string[] }
+  | { phase: 'professional_choice'; flow: 'individual' | 'team'; teamEmails?: string[]; teamName?: string }
   | { phase: 'selecting_method' }
   | { phase: 'loading'; method: PaymentMethod }
   | { phase: 'awaiting_payment'; session: PaymentSession; method: PaymentMethod }
@@ -82,8 +82,8 @@ type CheckoutState =
   | { phase: 'error'; message: string }
   // Fluxo de equipe
   | { phase: 'team_emails' }
-  | { phase: 'team_selecting_method'; emails: string[] }
-  | { phase: 'team_loading'; method: PaymentMethod; emails: string[] };
+  | { phase: 'team_selecting_method'; emails: string[]; teamName: string }
+  | { phase: 'team_loading'; method: PaymentMethod; emails: string[]; teamName: string };
 
 // ---- professional choice form ----
 
@@ -198,9 +198,11 @@ function TeamEmailsForm({
   onBack,
 }: {
   priceCents: number;
-  onConfirm: (emails: string[]) => void;
+  onConfirm: (teamName: string, emails: string[]) => void;
   onBack: () => void;
 }) {
+  const [teamName, setTeamName] = useState('');
+  const [teamNameTouched, setTeamNameTouched] = useState(false);
   const [emails, setEmails] = useState<string[]>(['', '']);
   const [touched, setTouched] = useState<boolean[]>([false, false]);
 
@@ -227,7 +229,8 @@ function TeamEmailsForm({
   const filledEmails = emails.map((e) => e.trim()).filter(Boolean);
   const uniqueEmails = [...new Set(filledEmails)];
   const hasDuplicates = filledEmails.length !== uniqueEmails.length;
-  const allValid = uniqueEmails.length >= 2 && uniqueEmails.every(isValidEmail) && !hasDuplicates;
+  const teamNameValid = teamName.trim().length >= 2;
+  const allValid = teamNameValid && uniqueEmails.length >= 2 && uniqueEmails.every(isValidEmail) && !hasDuplicates;
   const totalCents = priceCents * uniqueEmails.length;
 
   return (
@@ -236,6 +239,30 @@ function TeamEmailsForm({
         <p className="text-sm font-semibold text-white/80">Membros da equipe</p>
         {uniqueEmails.length >= 2 && (
           <span className="text-base font-bold text-white">{formatPrice(totalCents)}</span>
+        )}
+      </div>
+
+      {/* Nome da equipe */}
+      <div>
+        <label htmlFor="team-name" className="block text-sm font-semibold text-white/80 mb-1.5">
+          Nome da equipe
+        </label>
+        <input
+          id="team-name"
+          type="text"
+          placeholder="Ex: Equipe Thunder, Panteras FC..."
+          value={teamName}
+          onChange={(e) => setTeamName(e.target.value)}
+          onBlur={() => setTeamNameTouched(true)}
+          maxLength={100}
+          className={`w-full bg-white/5 border rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none focus:ring-1 transition-all ${
+            teamNameTouched && !teamNameValid
+              ? 'border-red-500/50 focus:ring-red-500/30'
+              : 'border-white/10 focus:border-white/25 focus:ring-white/10'
+          }`}
+        />
+        {teamNameTouched && !teamNameValid && (
+          <p className="text-[11px] text-red-400 mt-1 pl-1">Nome da equipe deve ter pelo menos 2 caracteres.</p>
         )}
       </div>
 
@@ -302,7 +329,7 @@ function TeamEmailsForm({
       )}
 
       <button
-        onClick={() => onConfirm(uniqueEmails)}
+        onClick={() => onConfirm(teamName.trim(), uniqueEmails)}
         disabled={!allValid}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#FF6B00] hover:bg-[#FF8533] text-white font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
       >
@@ -618,12 +645,12 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
     setCheckout({ phase: 'team_emails' });
   }, [user, openAuthModal]);
 
-  const handleTeamEmailsConfirmed = useCallback((emails: string[]) => {
+  const handleTeamEmailsConfirmed = useCallback((teamName: string, emails: string[]) => {
     if (detail?.requires_professional_choice) {
       setProfessionalChoice(null);
-      setCheckout({ phase: 'professional_choice', flow: 'team', teamEmails: emails });
+      setCheckout({ phase: 'professional_choice', flow: 'team', teamEmails: emails, teamName });
     } else {
-      setCheckout({ phase: 'team_selecting_method', emails });
+      setCheckout({ phase: 'team_selecting_method', emails, teamName });
     }
   }, [detail]);
 
@@ -631,8 +658,8 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
     setProfessionalChoice(choice);
     const co = checkout;
     if (co.phase === 'professional_choice') {
-      if (co.flow === 'team' && co.teamEmails) {
-        setCheckout({ phase: 'team_selecting_method', emails: co.teamEmails });
+      if (co.flow === 'team' && co.teamEmails && co.teamName) {
+        setCheckout({ phase: 'team_selecting_method', emails: co.teamEmails, teamName: co.teamName });
       } else {
         setCheckout({ phase: 'selecting_method' });
       }
@@ -651,10 +678,10 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
     }
   }, [detail, eventId, professionalChoice]);
 
-  const handleTeamMethodSelected = useCallback(async (method: PaymentMethod, emails: string[]) => {
-    setCheckout({ phase: 'team_loading', method, emails });
+  const handleTeamMethodSelected = useCallback(async (method: PaymentMethod, teamName: string, emails: string[]) => {
+    setCheckout({ phase: 'team_loading', method, emails, teamName });
     try {
-      const session = await initiateTeamCheckout(eventId, method, emails, professionalChoice ?? undefined);
+      const session = await initiateTeamCheckout(eventId, method, teamName, emails, professionalChoice ?? undefined);
       setCheckout({ phase: 'awaiting_payment', session, method });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Ocorreu um erro. Tente novamente.';
@@ -828,7 +855,7 @@ export function EventDetailModal({ eventId, onClose }: EventDetailModalProps) {
       return (
         <MethodSelector
           amountCents={totalCents}
-          onSelect={(method) => handleTeamMethodSelected(method, checkout.emails)}
+          onSelect={(method) => handleTeamMethodSelected(method, checkout.teamName, checkout.emails)}
           onBack={() => setCheckout({ phase: 'team_emails' })}
         />
       );

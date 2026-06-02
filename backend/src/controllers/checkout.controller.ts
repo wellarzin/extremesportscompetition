@@ -477,7 +477,7 @@ export async function initiateCheckout(
 export async function initiateTeamCheckout(
   request: FastifyRequest<{
     Params: { id: string };
-    Body: { method: PaymentMethod; member_emails: string[] } & ProfessionalChoiceBody;
+    Body: { method: PaymentMethod; member_emails: string[]; team_name: string } & ProfessionalChoiceBody;
   }>,
   reply: FastifyReply,
 ) {
@@ -492,8 +492,17 @@ export async function initiateTeamCheckout(
   const eventId = request.params.id;
   const method: PaymentMethod = request.body?.method ?? "pix";
   const rawEmails: string[] = request.body?.member_emails ?? [];
+  const teamName: string = request.body?.team_name?.trim() ?? "";
   const usesPlatform = request.body?.uses_platform_professional;
   const externalCref = request.body?.external_cref?.trim() ?? null;
+
+  // ---- 0. Validação do nome da equipe ----
+  if (!teamName || teamName.length < 2) {
+    return Errors.validation(reply, [{ message: "Informe o nome da equipe (mínimo 2 caracteres)." }]);
+  }
+  if (teamName.length > 100) {
+    return Errors.validation(reply, [{ message: "Nome da equipe deve ter no máximo 100 caracteres." }]);
+  }
 
   // ---- 1. Validação básica dos e-mails ----
   if (!Array.isArray(rawEmails) || rawEmails.length < 2) {
@@ -634,6 +643,7 @@ export async function initiateTeamCheckout(
     data: {
       event_id: eventId,
       buyer_user_id: userId,
+      team_name: teamName,
       member_emails: memberEmails,
       member_count: memberCount,
       status: "pending",
